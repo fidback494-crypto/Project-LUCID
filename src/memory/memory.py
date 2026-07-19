@@ -20,3 +20,23 @@ class MemoryEngine:
         """)
 
         self.conn.commit()
+
+    def add_memory(self, memory_type, content, importance=0.5):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO memories(memory_type, content, importance)
+            VALUES (?, ?, ?)
+            """,
+            (memory_type, content, importance),
+        )
+
+        self.conn.commit()
+
+    def get_memories(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute("SELECT * FROM memories")
+
+        return cursor.fetchall()

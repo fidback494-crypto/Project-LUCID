@@ -34,3 +34,28 @@ print("Memory")
 
 for m in memory.get_memories():
     print(m)
+    from src.event.event_manager import EventManager
+
+event_manager = EventManager()
+
+event_manager.add_event(
+    "conversation",
+    "사용자가 안녕이라고 말했다."
+)
+
+print("\nEvent")
+
+for event in event_manager.get_events():
+    print(event)
+    from src.planner.planner import Planner
+
+planner = Planner()
+
+action = planner.decide(
+    emotion,
+    memory.get_memories(),
+    event_manager.get_events()[-1]
+)
+
+print("\nPlanner")
+print(action)
