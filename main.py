@@ -18,3 +18,19 @@ emotion.praise()
 
 print("\nAfter Praise")
 print(emotion.show())
+from src.memory.memory import MemoryEngine
+
+memory = MemoryEngine()
+
+memory.add_memory(
+    "fact",
+    "사용자는 고양이를 좋아한다.",
+    0.9
+)
+
+print()
+
+print("Memory")
+
+for m in memory.get_memories():
+    print(m)
