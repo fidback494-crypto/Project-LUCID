@@ -40,3 +40,80 @@ class MemoryEngine:
         cursor.execute("SELECT * FROM memories")
 
         return cursor.fetchall()
+
+    def get_recent_memories(self, limit=10):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT content
+            FROM memories
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+        return [row[0] for row in cursor.fetchall()]
+
+    def exists(self, content):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM memories
+            WHERE content = ?
+            """,
+            (content,),
+        )
+
+        return cursor.fetchone()[0] > 0
+
+    def get_name(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT content
+            FROM memories
+            WHERE memory_type = 'name'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        )
+
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    def get_favorite_animal(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT content
+            FROM memories
+            WHERE memory_type = 'favorite_animal'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        )
+
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    def get_project(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT content
+            FROM memories
+            WHERE memory_type = 'project'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        )
+
+        row = cursor.fetchone()
+        return row[0] if row else None
