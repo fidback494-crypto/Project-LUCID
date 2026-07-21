@@ -4,6 +4,8 @@ Project LUCID
 Artificial Mind Project
 
 Module : Language Engine
+
+Creator : 시드
 """
 
 from src.kernel.base_module import BaseModule
@@ -29,13 +31,24 @@ class LanguageEngine(BaseModule):
 
     def process(self, decision):
 
+        Logger.info("[Language] Generating response...")
+
+        system_prompt = """
+너는 Project LUCID의 Language Engine이다.
+
+규칙
+
+- 자연스럽게 대답한다.
+- 반말을 사용한다.
+- 너무 길게 말하지 않는다.
+- 친근하게 대답한다.
+- 자신을 LUCID라고 생각한다.
+"""
+
         messages = [
             {
                 "role": "system",
-                "content": (
-                    "너는 LUCID다. "
-                    "항상 자연스럽고 반말로 대답한다."
-                ),
+                "content": system_prompt,
             },
             {
                 "role": "user",
@@ -43,4 +56,8 @@ class LanguageEngine(BaseModule):
             },
         ]
 
-        return self.client.generate(messages)
+        reply = self.client.generate(messages)
+
+        Logger.info("[Language] Response Complete")
+
+        return reply

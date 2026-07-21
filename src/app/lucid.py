@@ -49,7 +49,7 @@ class LucidEngine:
         # Language
         self.language = LanguageEngine()
 
-        # Life Loop
+        # LifeLoop
         self.life = LifeLoop(
             observation_engine=self.observation,
             working_memory=self.memory,
@@ -62,13 +62,18 @@ class LucidEngine:
 
     def boot(self):
 
-        Logger.info("Booting LUCID...")
+        Logger.info("========== LUCID BOOT ==========")
 
         self.kernel.register(self.heartbeat)
         self.kernel.register(self.consciousness)
+
+        self.kernel.register(self.observation)
+
         self.kernel.register(self.memory)
+
         self.kernel.register(self.thought)
         self.kernel.register(self.decision)
+
         self.kernel.register(self.language)
 
         self.kernel.start()
@@ -81,29 +86,34 @@ class LucidEngine:
 
         while self.running:
 
-            user = input("\n시드 > ").strip()
-
-            if not user:
-                continue
-
-            if user.lower() in ("exit", "quit"):
-
-                self.shutdown()
-                break
-
             try:
+
+                user = input("\n시드 > ").strip()
+
+                if not user:
+                    continue
+
+                if user.lower() in ("exit", "quit"):
+
+                    self.shutdown()
+                    break
 
                 reply = self.life.process(user)
 
                 print(f"\nLUCID > {reply}")
 
+            except KeyboardInterrupt:
+
+                self.shutdown()
+                break
+
             except Exception as e:
 
-                Logger.error(f"LifeLoop Error : {e}")
+                Logger.error(str(e))
 
     def shutdown(self):
 
-        Logger.info("Shutting down LUCID...")
+        Logger.info("Shutting Down...")
 
         self.kernel.stop()
 

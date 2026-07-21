@@ -1,3 +1,13 @@
+"""
+Project LUCID
+
+Artificial Mind Project
+
+Module : Decision Engine
+
+Creator : 시드
+"""
+
 from src.kernel.base_module import BaseModule
 from src.utils import Logger
 
@@ -20,12 +30,26 @@ class DecisionEngine(BaseModule):
 
     def process(self, thought):
 
-     decision = Decision(
-        action="respond",
-        reason=thought.content,
-        confidence=0.9,
-    )
+        text = thought.content.lower()
 
-     Logger.info(f"[Decision] {decision.reason}")
+        # Sprint001 규칙 기반 판단
+        if "인사" in text:
+            action = "respond_greeting"
 
-     return decision
+        elif "질문" in text:
+            action = "answer"
+
+        else:
+            action = "respond"
+
+        decision = Decision(
+            action=action,
+            reason=thought.content,
+            confidence=0.95,
+        )
+
+        Logger.info(
+            f"[Decision] {decision.action}"
+        )
+
+        return decision

@@ -1,7 +1,8 @@
-from src.engine.lucid_engine import LucidEngine
+from src.app.lucid import LucidEngine
 
 
 def main():
+
     lucid = LucidEngine()
 
     lucid.boot()
