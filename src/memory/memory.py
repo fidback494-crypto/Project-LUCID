@@ -34,10 +34,28 @@ class MemoryEngine:
 
         self.conn.commit()
 
+    def exists(self, content):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM memories
+            WHERE content = ?
+            """,
+            (content,),
+        )
+
+        return cursor.fetchone()[0] > 0
+
     def get_memories(self):
         cursor = self.conn.cursor()
 
-        cursor.execute("SELECT * FROM memories")
+        cursor.execute("""
+        SELECT *
+        FROM memories
+        ORDER BY created_at DESC
+        """)
 
         return cursor.fetchall()
 
@@ -56,20 +74,6 @@ class MemoryEngine:
 
         return [row[0] for row in cursor.fetchall()]
 
-    def exists(self, content):
-        cursor = self.conn.cursor()
-
-        cursor.execute(
-            """
-            SELECT COUNT(*)
-            FROM memories
-            WHERE content = ?
-            """,
-            (content,),
-        )
-
-        return cursor.fetchone()[0] > 0
-
     def get_name(self):
         cursor = self.conn.cursor()
 
@@ -77,7 +81,7 @@ class MemoryEngine:
             """
             SELECT content
             FROM memories
-            WHERE memory_type = 'name'
+            WHERE memory_type='name'
             ORDER BY created_at DESC
             LIMIT 1
             """
@@ -93,7 +97,7 @@ class MemoryEngine:
             """
             SELECT content
             FROM memories
-            WHERE memory_type = 'favorite_animal'
+            WHERE memory_type='favorite_animal'
             ORDER BY created_at DESC
             LIMIT 1
             """
@@ -109,7 +113,7 @@ class MemoryEngine:
             """
             SELECT content
             FROM memories
-            WHERE memory_type = 'project'
+            WHERE memory_type='project'
             ORDER BY created_at DESC
             LIMIT 1
             """
@@ -117,3 +121,62 @@ class MemoryEngine:
 
         row = cursor.fetchone()
         return row[0] if row else None
+
+    # -----------------------------
+    # Goal API
+    # -----------------------------
+
+    def set_goal(self, goal):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            DELETE FROM memories
+            WHERE memory_type='goal'
+            """
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO memories(memory_type, content, importance)
+            VALUES (?, ?, ?)
+            """,
+            (
+                "goal",
+                goal,
+                1.0,
+            ),
+        )
+
+        self.conn.commit()
+
+    def get_goal(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT content
+            FROM memories
+            WHERE memory_type='goal'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        )
+
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    def has_goal(self):
+        return self.get_goal() is not None
+
+    def clear_goal(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            DELETE FROM memories
+            WHERE memory_type='goal'
+            """
+        )
+
+        self.conn.commit()

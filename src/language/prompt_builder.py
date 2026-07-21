@@ -1,7 +1,14 @@
 class PromptBuilder:
-    def build(self, emotion, memories, event):
+    def build(
+        self,
+        emotion,
+        memories,
+        event,
+        goal,
+    ):
 
         memory_text = "\n".join(memories) if memories else "없음"
+        goal_text = goal if goal else "없음"
 
         prompt = f"""
 당신은 LUCID라는 AI입니다.
@@ -19,6 +26,9 @@ class PromptBuilder:
 
 ## 기억
 {memory_text}
+
+## 현재 목표
+{goal_text}
 
 ## 현재 상황
 {event}
