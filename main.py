@@ -2,14 +2,11 @@ from src.engine.lucid_engine import LucidEngine
 
 
 def main():
-    engine = LucidEngine()
+    lucid = LucidEngine()
 
-    print("=" * 40)
-    print("LUCID AI")
-    print("=" * 40)
+    lucid.boot()
 
-    print("Engine Loaded Successfully!")
-    print(engine.state.status())
+    lucid.run()
 
 
 if __name__ == "__main__":

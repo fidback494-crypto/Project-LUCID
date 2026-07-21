@@ -1,21 +1,42 @@
-import time
+from src.mind.observation_engine import ObservationEngine
+from src.memory.working_memory import WorkingMemory
+from src.mind.thought_engine import ThoughtEngine
+from src.mind.decision_engine import DecisionEngine
 
-from src.life.heartbeat import Heartbeat
-from src.life.consciousness import Consciousness
+observation = ObservationEngine()
+memory = WorkingMemory()
+thought = ThoughtEngine()
+decision = DecisionEngine()
 
+observation.start()
+memory.start()
+thought.start()
+decision.start()
 
-heartbeat = Heartbeat()
-consciousness = Consciousness()
+# 1. 관찰
+obs = observation.observe(
+    "user",
+    "시드가 안녕이라고 말했다."
+)
 
-heartbeat.start()
-consciousness.start()
+# 2. 단기 기억
+memory.add(obs)
 
-for _ in range(5):
+# 3. 생각 생성
+t = thought.create(
+    "사용자에게 인사해야 한다."
+)
 
-    heartbeat.update()
-    consciousness.update()
+# 4. 판단
+d = decision.decide(t)
 
-    time.sleep(1)
+print()
+print("===== Pipeline =====")
+print(obs)
+print(t)
+print(d)
 
-heartbeat.stop()
-consciousness.stop()
+decision.stop()
+thought.stop()
+memory.stop()
+observation.stop()
