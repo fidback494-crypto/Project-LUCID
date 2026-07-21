@@ -1,33 +1,21 @@
-from src.brain.brain import Brain
+import time
 
-brain = Brain()
+from src.life.heartbeat import Heartbeat
+from src.life.consciousness import Consciousness
 
-emotion = {
-    "happiness": 60,
-    "curiosity": 75,
-    "loneliness": 15,
-}
 
-memories = [
-    "사용자는 고양이를 좋아한다.",
-    "사용자는 AI를 직접 만들고 있다."
-]
+heartbeat = Heartbeat()
+consciousness = Consciousness()
 
-event = "사용자가 인사를 했다."
+heartbeat.start()
+consciousness.start()
 
-while True:
-    user = input("나 : ")
+for _ in range(5):
 
-    if user.lower() == "exit":
-        break
+    heartbeat.update()
+    consciousness.update()
 
-    print("\n LUCID 생각 중...")
+    time.sleep(1)
 
-    reply = brain.think(
-     emotion,
-   
-     event,
-     user
-    )
-
-    print("\nLUCID :", reply)
+heartbeat.stop()
+consciousness.stop()
