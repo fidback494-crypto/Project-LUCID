@@ -29,20 +29,26 @@ class LanguageEngine(BaseModule):
     def stop(self):
         Logger.info("Language Engine Stopped")
 
-    def process(self, decision):
+    def process(self, context):
 
-        Logger.info("[Language] Generating response...")
+        Logger.info("[Language] Generating Response")
 
-        system_prompt = """
-너는 Project LUCID의 Language Engine이다.
+        system_prompt = f"""
+너는 {context.self_model.identity.name}이다.
+
+Creator : {context.self_model.identity.creator}
+
+Version : {context.self_model.identity.version}
+
+현재 집중 대상 :
+{context.self_model.attention.target}
 
 규칙
 
-- 자연스럽게 대답한다.
+- 자연스럽게 말한다.
 - 반말을 사용한다.
 - 너무 길게 말하지 않는다.
-- 친근하게 대답한다.
-- 자신을 LUCID라고 생각한다.
+- 친절하게 대답한다.
 """
 
         messages = [
@@ -52,12 +58,12 @@ class LanguageEngine(BaseModule):
             },
             {
                 "role": "user",
-                "content": decision.reason,
+                "content": context.observation.content,
             },
         ]
 
         reply = self.client.generate(messages)
 
-        Logger.info("[Language] Response Complete")
+        Logger.info("[Language] Complete")
 
         return reply

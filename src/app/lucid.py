@@ -7,7 +7,7 @@ Application : LUCID
 
 Creator : 시드
 """
-
+from src.mind.reasoning_engine import ReasoningEngine
 from src.kernel.kernel import Kernel
 
 from src.life.heartbeat import Heartbeat
@@ -24,13 +24,30 @@ from src.mind.decision_engine import DecisionEngine
 from src.language.language_engine import LanguageEngine
 
 from src.utils import Logger
+from src.self import SelfModel
+from src.mind.reasoning_engine import ReasoningEngine
+from src.mind.planning_engine import PlanningEngine
 
 
 class LucidEngine:
 
     def __init__(self):
 
+        
+        from src.self import SelfModel
+        self.self_model = SelfModel()
+
+        self.planning = PlanningEngine()
+        
+     # Self
+        self.self_model = SelfModel()
+
+       # Reasoning
+        self.reasoning = ReasoningEngine()
+        
+
         self.kernel = Kernel()
+
 
         # Life
         self.heartbeat = Heartbeat()
@@ -43,6 +60,7 @@ class LucidEngine:
         self.memory = WorkingMemory()
 
         # Mind
+        self.reasoning = ReasoningEngine()
         self.thought = ThoughtEngine()
         self.decision = DecisionEngine()
 
@@ -51,12 +69,17 @@ class LucidEngine:
 
         # LifeLoop
         self.life = LifeLoop(
-            observation_engine=self.observation,
-            working_memory=self.memory,
-            thought_engine=self.thought,
-            decision_engine=self.decision,
-            language_engine=self.language,
-        )
+        
+           observation_engine=self.observation,
+           working_memory=self.memory,
+           reasoning_engine=self.reasoning,
+           thought_engine=self.thought,
+           planning_engine=self.planning,
+           decision_engine=self.decision,
+           language_engine=self.language,
+           self_model=self.self_model,
+)
+
 
         self.running = False
 
@@ -66,11 +89,13 @@ class LucidEngine:
 
         self.kernel.register(self.heartbeat)
         self.kernel.register(self.consciousness)
+        self.kernel.register(self.planning)
 
         self.kernel.register(self.observation)
 
         self.kernel.register(self.memory)
 
+        self.kernel.register(self.reasoning)
         self.kernel.register(self.thought)
         self.kernel.register(self.decision)
 

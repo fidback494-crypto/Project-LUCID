@@ -28,28 +28,14 @@ class DecisionEngine(BaseModule):
     def stop(self):
         Logger.info("Decision Engine Stopped")
 
-    def process(self, thought):
-
-        text = thought.content.lower()
-
-        # Sprint001 규칙 기반 판단
-        if "인사" in text:
-            action = "respond_greeting"
-
-        elif "질문" in text:
-            action = "answer"
-
-        else:
-            action = "respond"
+    def process(self, plan):
 
         decision = Decision(
-            action=action,
-            reason=thought.content,
-            confidence=0.95,
+            action="respond",
+            reason=plan.goal,
+            confidence=plan.priority,
         )
 
-        Logger.info(
-            f"[Decision] {decision.action}"
-        )
+        Logger.info(f"[Decision] {decision.action}")
 
         return decision

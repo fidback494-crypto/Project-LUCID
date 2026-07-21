@@ -28,20 +28,28 @@ class ThoughtEngine(BaseModule):
     def stop(self):
         Logger.info("Thought Engine Stopped")
 
-    def process(self, observation):
+    def process(self, reason):
 
-        content = observation.content
+        if reason.intent == "greeting":
 
-        # Sprint001에서는 단순 사고 생성
-        if any(word in content for word in ["안녕", "ㅎㅇ", "hello"]):
-            thought_text = "사용자가 인사했다."
+            thought_text = "인사에 응답하는 것이 적절하다."
+
+        elif reason.intent == "question":
+
+            thought_text = "질문에 정확하게 답해야 한다."
+
+        elif reason.intent == "exit":
+
+            thought_text = "사용자가 종료를 원한다."
+
         else:
-            thought_text = f"사용자가 '{content}'라고 말했다."
+
+            thought_text = reason.summary
 
         thought = Thought(
-            type="observation",
+            type=reason.intent,
             content=thought_text,
-            importance=observation.importance,
+            importance=reason.confidence,
         )
 
         Logger.info(f"[Thought] {thought.content}")
