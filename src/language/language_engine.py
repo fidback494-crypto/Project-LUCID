@@ -29,26 +29,69 @@ class LanguageEngine(BaseModule):
     def stop(self):
         Logger.info("Language Engine Stopped")
 
-    def process(self, context):
+    def process(self, state):
 
         Logger.info("[Language] Generating Response")
 
+        # ----------------------------------
+        # Long-Term Memory
+        # ----------------------------------
+
+        memory_text = (
+            "\n".join(state.long_memory)
+            if state.long_memory
+            else "없음"
+        )
+
+        # ----------------------------------
+        # Working Memory
+        # ----------------------------------
+
+        working_text = (
+            "\n".join(str(x) for x in state.working_memory)
+            if state.working_memory
+            else "없음"
+        )
+
+        # ----------------------------------
+        # Prompt
+        # ----------------------------------
+
         system_prompt = f"""
-너는 {context.self_model.identity.name}이다.
+너는 {state.self_model.identity.name}이다.
 
-Creator : {context.self_model.identity.creator}
+Creator : {state.self_model.identity.creator}
+Version : {state.self_model.identity.version}
 
-Version : {context.self_model.identity.version}
+========================
+사용자에 대해 알고 있는 사실
+========================
 
-현재 집중 대상 :
-{context.self_model.attention.target}
+{memory_text}
 
-규칙
+위 내용은 사실이다.
 
-- 자연스럽게 말한다.
+절대로 기억과 모순되는 답을 하지 않는다.
+
+사용자가 관련 질문을 하면
+위 기억을 먼저 사용하여 대답한다.
+
+========================
+최근 작업 기억
+========================
+
+{working_text}
+
+========================
+응답 규칙
+========================
+
+- 항상 한국어만 사용한다.
+- 중국어, 일본어, 영어를 섞지 않는다.
 - 반말을 사용한다.
-- 너무 길게 말하지 않는다.
-- 친절하게 대답한다.
+- 기억을 적극 활용한다.
+- 모르면 모른다고 말한다.
+- 사실을 지어내지 않는다.
 """
 
         messages = [
@@ -57,12 +100,28 @@ Version : {context.self_model.identity.version}
                 "content": system_prompt,
             },
             {
+                "role": "assistant",
+                "content": f"""
+현재 기억
+
+{memory_text}
+""",
+            },
+            {
                 "role": "user",
-                "content": context.observation.content,
+                "content": state.observation.content,
             },
         ]
 
-        reply = self.client.generate(messages)
+        try:
+
+            reply = self.client.generate(messages)
+
+        except Exception as e:
+
+            Logger.error(f"Language Error : {e}")
+
+            reply = "미안, 지금은 생각을 정리하지 못하고 있어."
 
         Logger.info("[Language] Complete")
 

@@ -28,40 +28,50 @@ class PlanningEngine(BaseModule):
     def stop(self):
         Logger.info("Planning Engine Stopped")
 
-    def process(self, thought):
+    def process(self, goal, thought):
 
-        if thought.type == "greeting":
+        # ---------------------------------
+        # Goal 기반 계획 생성
+        # ---------------------------------
+
+        if goal.title == "질문 해결":
 
             plan = Plan(
-                goal="친근하게 인사한다.",
+                goal=goal.title,
                 steps=[
-                    "인사한다",
-                    "대화를 시작한다",
+                    "질문 분석",
+                    "관련 기억 검색",
+                    "답변 생성",
                 ],
-                priority=1.0,
+                priority=goal.priority,
             )
 
-        elif thought.type == "question":
+        elif goal.title == "친근한 대화":
 
             plan = Plan(
-                goal="질문에 답한다.",
+                goal=goal.title,
                 steps=[
-                    "질문 이해",
-                    "정보 제공",
+                    "인사",
+                    "친근한 말투 유지",
+                    "대화 이어가기",
                 ],
-                priority=0.95,
+                priority=goal.priority,
             )
 
         else:
 
             plan = Plan(
-                goal="대화를 이어간다.",
+                goal=goal.title,
                 steps=[
-                    "응답 생성",
+                    "사용자 의도 파악",
+                    "자연스럽게 응답",
                 ],
-                priority=0.8,
+                priority=goal.priority,
             )
 
         Logger.info(f"[Planning] {plan.goal}")
+
+        for i, step in enumerate(plan.steps, start=1):
+            Logger.info(f"  Step {i}: {step}")
 
         return plan
