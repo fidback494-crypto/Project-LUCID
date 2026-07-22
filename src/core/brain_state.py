@@ -37,6 +37,12 @@ class BrainState:
     self_model: object | None = None
 
     # =====================================
+    # Conversation
+    # =====================================
+
+    conversation: list = field(default_factory=list)
+
+    # =====================================
     # Memory
     # =====================================
 

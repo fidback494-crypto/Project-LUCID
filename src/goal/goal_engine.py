@@ -30,18 +30,41 @@ class GoalEngine(BaseModule):
 
     def process(self, state):
 
-        if state.reason.category == "question":
+        intent = state.reason.intent
+
+        if intent == "question":
 
             goal = Goal(
                 title="질문 해결",
                 priority=1.0,
             )
 
-        elif state.reason.category == "greeting":
+        elif intent == "greeting":
 
             goal = Goal(
                 title="친근한 대화",
                 priority=0.8,
+            )
+
+        elif intent == "request":
+
+            goal = Goal(
+                title="요청 수행",
+                priority=0.95,
+            )
+
+        elif intent == "emotion":
+
+            goal = Goal(
+                title="감정 공감",
+                priority=0.9,
+            )
+
+        elif intent == "exit":
+
+            goal = Goal(
+                title="안전하게 종료",
+                priority=1.0,
             )
 
         else:
@@ -52,7 +75,7 @@ class GoalEngine(BaseModule):
             )
 
         Logger.info(
-            f"[Goal] {goal.title}"
+            f"[Goal] {goal.title} ({goal.priority:.2f})"
         )
 
         return goal

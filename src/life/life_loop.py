@@ -26,6 +26,7 @@ class LifeLoop:
         language_engine,
         reflection_engine,
         experience_engine,
+        conversation_manager,
         self_model,
         long_memory,
         extractor,
@@ -42,6 +43,7 @@ class LifeLoop:
         self.language = language_engine
         self.reflection = reflection_engine
         self.experience = experience_engine
+        self.conversation = conversation_manager
 
         self.self_model = self_model
 
@@ -56,26 +58,30 @@ class LifeLoop:
         state = BrainState()
         state.self_model = self.self_model
 
-        # -------------------------------------------------
+        # =================================================
         # 1. Observation
-        # -------------------------------------------------
+        # =================================================
 
         state.observation = self.observation.process(user_input)
 
-        # -------------------------------------------------
-        # 2. Working Memory
-        # -------------------------------------------------
+        # =================================================
+        # 2. Conversation History
+        # =================================================
+
+        state.conversation = self.conversation.messages()
+
+        # =================================================
+        # 3. Working Memory
+        # =================================================
 
         self.memory.process(state.observation)
         state.working_memory = self.memory.recent(5)
 
-        # -------------------------------------------------
-        # 3. Memory Extraction
-        # -------------------------------------------------
+        # =================================================
+        # 4. Memory Extraction
+        # =================================================
 
         record = self.extractor.extract(state.observation)
-
-        Logger.info(f"[Debug] Extract Result : {record}")
 
         if record:
 
@@ -85,82 +91,83 @@ class LifeLoop:
                 f"[LongMemory] Stored : {record.content}"
             )
 
-        else:
-
-            Logger.info("[LongMemory] Nothing Stored")
-
-        # -------------------------------------------------
-        # 4. Long Memory Search
-        # -------------------------------------------------
+        # =================================================
+        # 5. Long Memory Search
+        # =================================================
 
         state.long_memory = self.search.search(
             state.observation
         )
 
         Logger.info(
-            f"[LongMemory] Search Result : {state.long_memory}"
+            f"[LongMemory] Search : {state.long_memory}"
         )
 
-        # -------------------------------------------------
-        # 5. Reasoning
-        # -------------------------------------------------
+        # =================================================
+        # 6. Reasoning (LLM)
+        # =================================================
 
-        state.reason = self.reasoning.process(
-            state.observation
-        )
+        state.reason = self.reasoning.process(state)
 
-        # -------------------------------------------------
-        # 6. Goal
-        # -------------------------------------------------
+        # =================================================
+        # 7. Thought (LLM)
+        # =================================================
+
+        state.thought = self.thought.process(state)
+
+        # =================================================
+        # 8. Goal
+        # =================================================
 
         state.goal = self.goal.process(state)
 
-        # -------------------------------------------------
-        # 7. Thought
-        # -------------------------------------------------
+        # =================================================
+        # 9. Planning (LLM)
+        # =================================================
 
-        state.thought = self.thought.process(
-            state.reason
-        )
+        state.plan = self.planning.process(state)
 
-        # -------------------------------------------------
-        # 8. Planning
-        # -------------------------------------------------
-
-        state.plan = self.planning.process(
-            state.goal,
-            state.thought,
-        )
-
-        # -------------------------------------------------
-        # 9. Decision
-        # -------------------------------------------------
+        # =================================================
+        # 10. Decision
+        # =================================================
 
         state.decision = self.decision.process(
             state.plan
         )
 
-        # -------------------------------------------------
-        # 10. Language
-        # -------------------------------------------------
+        # =================================================
+        # 11. Language
+        # =================================================
 
         state.response = self.language.process(state)
 
-        # -------------------------------------------------
-        # 11. Reflection
-        # -------------------------------------------------
+        # =================================================
+        # 12. Conversation Update
+        # =================================================
+
+        self.conversation.add_user(
+            state.observation.content
+        )
+
+        self.conversation.add_assistant(
+            state.response
+        )
+
+        # =================================================
+        # 13. Reflection
+        # =================================================
 
         state.reflection = self.reflection.process(state)
 
-        # -------------------------------------------------
-        # 12. Experience
-        # -------------------------------------------------
+        # =================================================
+        # 14. Experience
+        # =================================================
 
         state.experience = self.experience.process(state)
 
-        # -------------------------------------------------
-        # 13. Working Memory Update
-        # -------------------------------------------------
+        # =================================================
+        # 15. Working Memory Update
+        # =================================================
 
         self.memory.process(state.reflection)
 

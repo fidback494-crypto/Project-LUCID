@@ -9,6 +9,7 @@ Creator : 시드
 """
 
 from src.kernel.kernel import Kernel
+from src.conversation.conversation_manager import ConversationManager
 
 # Life
 from src.life.heartbeat import Heartbeat
@@ -51,6 +52,7 @@ class LucidEngine:
     def __init__(self):
 
         self.kernel = Kernel()
+        self.conversation = ConversationManager()
 
         # ============================
         # Life
@@ -108,6 +110,7 @@ class LucidEngine:
         # ============================
 
         self.life = LifeLoop(
+            conversation_manager=self.conversation,
             observation_engine=self.observation,
             working_memory=self.memory,
             reasoning_engine=self.reasoning,
