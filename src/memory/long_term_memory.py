@@ -26,6 +26,10 @@ class LongTermMemory:
 
         self.cursor = self.db.cursor()
 
+        # ==========================================
+        # Create Table
+        # ==========================================
+
         self.cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS memories(
@@ -45,98 +49,207 @@ class LongTermMemory:
 
         self.db.commit()
 
-    # ----------------------------------
-    # Store
-    # ----------------------------------
+        # ==========================================
+        # Database Migration
+        # ==========================================
 
-    def store(self, record: MemoryRecord):
+        self._migrate()
+
+    # ==========================================
+    # Migration
+    # ==========================================
+
+    def _migrate(self):
 
         self.cursor.execute(
+            "PRAGMA table_info(memories)"
+        )
 
-            """
-            INSERT OR IGNORE INTO memories
-            (
-                category,
-                content,
-                importance,
-                created_at
+        columns = [
+            row[1]
+            for row in self.cursor.fetchall()
+        ]
+
+        # ------------------------------------------
+        # created_at
+        # ------------------------------------------
+
+        if "created_at" not in columns:
+
+            Logger.info(
+                "[SQLite] Adding missing column : created_at"
             )
 
-            VALUES(?,?,?,?)
-            """,
+            self.cursor.execute(
+                """
+                ALTER TABLE memories
+                ADD COLUMN created_at TEXT
+                """
+            )
 
-            (
-                record.category,
-                record.content,
-                record.importance,
-                datetime.now().isoformat(),
-            ),
-        )
+        # ------------------------------------------
+        # Commit
+        # ------------------------------------------
 
         self.db.commit()
 
         Logger.info(
-            f"[SQLite] Stored : {record.content}"
+            "[SQLite] Database schema checked"
         )
 
-    # ----------------------------------
+    # ==========================================
+    # Store
+    # ==========================================
+
+    def store(self, record: MemoryRecord):
+
+        try:
+
+            self.cursor.execute(
+
+                """
+                INSERT OR IGNORE INTO memories
+                (
+                    category,
+                    content,
+                    importance,
+                    created_at
+                )
+
+                VALUES(?,?,?,?)
+                """,
+
+                (
+                    record.category,
+                    record.content,
+                    record.importance,
+                    datetime.now().isoformat(),
+                ),
+            )
+
+            self.db.commit()
+
+            Logger.info(
+                f"[SQLite] Stored : {record.content}"
+            )
+
+        except Exception as e:
+
+            Logger.error(
+                f"[SQLite] Store Error : {e}"
+            )
+
+    # ==========================================
     # Search
-    # ----------------------------------
+    # ==========================================
 
     def search(self, keyword):
 
-        self.cursor.execute(
+        try:
 
-            """
-            SELECT content
+            self.cursor.execute(
 
-            FROM memories
+                """
+                SELECT content
 
-            WHERE content LIKE ?
+                FROM memories
 
-            ORDER BY importance DESC
+                WHERE content LIKE ?
 
-            LIMIT 5
-            """,
+                ORDER BY importance DESC
 
-            (f"%{keyword}%",),
-        )
+                LIMIT 5
+                """,
 
-        rows = self.cursor.fetchall()
+                (f"%{keyword}%",),
+            )
 
-        return [row[0] for row in rows]
+            rows = self.cursor.fetchall()
 
-    # ----------------------------------
+            return [
+                row[0]
+                for row in rows
+            ]
+
+        except Exception as e:
+
+            Logger.error(
+                f"[SQLite] Search Error : {e}"
+            )
+
+            return []
+
+    # ==========================================
     # All Memories
-    # ----------------------------------
+    # ==========================================
 
     def all(self):
 
-        self.cursor.execute(
+        try:
 
-            """
-            SELECT
-                category,
-                content,
-                importance,
-                created_at
+            self.cursor.execute(
 
-            FROM memories
+                """
+                SELECT
+                    category,
+                    content,
+                    importance,
+                    created_at
 
-            ORDER BY importance DESC
-            """
-        )
+                FROM memories
 
-        return self.cursor.fetchall()
+                ORDER BY importance DESC
+                """
+            )
 
-    # ----------------------------------
+            return self.cursor.fetchall()
+
+        except Exception as e:
+
+            Logger.error(
+                f"[SQLite] All Error : {e}"
+            )
+
+            return []
+
+    # ==========================================
     # Count
-    # ----------------------------------
+    # ==========================================
 
     def count(self):
 
-        self.cursor.execute(
-            "SELECT COUNT(*) FROM memories"
-        )
+        try:
 
-        return self.cursor.fetchone()[0]
+            self.cursor.execute(
+                "SELECT COUNT(*) FROM memories"
+            )
+
+            return self.cursor.fetchone()[0]
+
+        except Exception as e:
+
+            Logger.error(
+                f"[SQLite] Count Error : {e}"
+            )
+
+            return 0
+
+    # ==========================================
+    # Close
+    # ==========================================
+
+    def close(self):
+
+        try:
+
+            self.db.close()
+
+            Logger.info(
+                "[SQLite] Database Closed"
+            )
+
+        except Exception as e:
+
+            Logger.error(
+                f"[SQLite] Close Error : {e}"
+            )

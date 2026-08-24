@@ -12,16 +12,36 @@ from .identity import Identity
 from .attention import Attention
 from .needs import Needs
 
+from src.emotion.emotion_state import EmotionState
+
 
 class SelfModel:
 
     def __init__(self):
 
+        # ============================
+        # Identity
+        # ============================
+
         self.identity = Identity()
+
+        # ============================
+        # Attention
+        # ============================
 
         self.attention = Attention()
 
+        # ============================
+        # Needs
+        # ============================
+
         self.needs = Needs()
+
+        # ============================
+        # Emotion
+        # ============================
+
+        self.emotion = EmotionState()
 
     def status(self):
 
@@ -31,4 +51,13 @@ class SelfModel:
             "version": self.identity.version,
             "focus": self.attention.target,
             "curiosity": self.needs.curiosity,
+
+            # Emotion
+            "joy": self.emotion.joy,
+            "confidence": self.emotion.confidence,
+            "emotion_curiosity": self.emotion.curiosity,
+            "sadness": self.emotion.sadness,
+            "anger": self.emotion.anger,
+            "fear": self.emotion.fear,
+            "fatigue": self.emotion.fatigue,
         }

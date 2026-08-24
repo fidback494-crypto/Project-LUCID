@@ -7,7 +7,11 @@ Application : LUCID
 
 Creator : 시드
 """
-
+from src.action.tools.memory_tool import MemoryTool
+from src.action.tools.calculator_tool import CalculatorTool
+from src.action.action_engine import ActionEngine
+from src.workspace.workspace_engine import WorkspaceEngine
+from src.emotion.emotion_engine import EmotionEngine
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -50,6 +54,13 @@ from src.utils import Logger
 class LucidEngine:
 
     def __init__(self):
+        self.action = ActionEngine()
+        self.action.register(
+             "calculator",
+             CalculatorTool(),
+        )
+      
+        self.workspace = WorkspaceEngine()
 
         self.kernel = Kernel()
         self.conversation = ConversationManager()
@@ -64,6 +75,7 @@ class LucidEngine:
         # ============================
         # Self
         # ============================
+        
 
         self.self_model = SelfModel()
         self.experience = ExperienceEngine()
@@ -80,8 +92,25 @@ class LucidEngine:
 
         self.memory = WorkingMemory()
         self.long_memory = LongTermMemory()
+        self.action.register(
+        "calculator",
+        CalculatorTool(),
+       )
+
+
+        
+        self.action.register(
+        "memory",
+         MemoryTool(self.long_memory),
+        )
         self.extractor = MemoryExtractor()
         self.search = MemorySearch(self.long_memory)
+
+        # ============================
+        # Emotion
+        # ============================
+
+        self.emotion = EmotionEngine()
 
         # ============================
         # Mind
@@ -109,29 +138,58 @@ class LucidEngine:
         # Life Loop
         # ============================
 
+       # ============================
+# Life Loop
+# ============================
+
         self.life = LifeLoop(
-            conversation_manager=self.conversation,
-            observation_engine=self.observation,
-            working_memory=self.memory,
-            reasoning_engine=self.reasoning,
-            thought_engine=self.thought,
-            goal_engine=self.goal,
-            planning_engine=self.planning,
-            decision_engine=self.decision,
-            language_engine=self.language,
-            reflection_engine=self.reflection,
-            experience_engine=self.experience,
-            self_model=self.self_model,
-            long_memory=self.long_memory,
-            extractor=self.extractor,
-            search=self.search,
-        )
+            
+            
+            
+         conversation_manager=self.conversation,
+
+         observation_engine=self.observation,
+
+         emotion_engine=self.emotion,
+
+         working_memory=self.memory,
+
+         reasoning_engine=self.reasoning,
+
+         thought_engine=self.thought,
+
+         goal_engine=self.goal,
+
+         planning_engine=self.planning,
+
+         decision_engine=self.decision,
+
+         language_engine=self.language,
+
+         reflection_engine=self.reflection,
+    
+         experience_engine=self.experience,
+
+         self_model=self.self_model,
+ 
+         long_memory=self.long_memory,
+
+          extractor=self.extractor,
+
+         search=self.search,
+
+          workspace_engine=self.workspace,   # ← 추가
+         action_engine=self.action,
+           )
 
         self.running = False
 
     def boot(self):
 
         Logger.info("========== LUCID BOOT ==========")
+        self.kernel.register(self.workspace)
+
+        self.kernel.register(self.action)
 
         self.kernel.register(self.heartbeat)
         self.kernel.register(self.consciousness)
@@ -139,6 +197,8 @@ class LucidEngine:
         self.kernel.register(self.observation)
 
         self.kernel.register(self.memory)
+
+        self.kernel.register(self.emotion)
 
         self.kernel.register(self.reasoning)
         self.kernel.register(self.goal)
@@ -199,10 +259,23 @@ class LucidEngine:
 
                 if user == "/status":
 
+                    emotion = self.self_model.emotion
+
                     print("\n========== STATUS ==========")
                     print("Working Memory :", self.memory.size())
                     print("Long Memory    :", self.long_memory.count())
                     print("Identity       :", self.self_model.identity.name)
+
+                    print(
+                        f"Emotion        : "
+                        f"Joy={emotion.joy:.2f}, "
+                        f"Curiosity={emotion.curiosity:.2f}, "
+                        f"Confidence={emotion.confidence:.2f}, "
+                        f"Sadness={emotion.sadness:.2f}, "
+                        f"Anger={emotion.anger:.2f}, "
+                        f"Fear={emotion.fear:.2f}, "
+                        f"Fatigue={emotion.fatigue:.2f}"
+                    )
 
                     continue
 

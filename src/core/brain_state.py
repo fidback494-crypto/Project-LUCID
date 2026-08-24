@@ -64,10 +64,23 @@ class BrainState:
     attention: object | None = None
 
     # =====================================
+    # Action
+    # =====================================
+
+    action: object | None = None
+    action_result: object | None = None
+    action_result: object | None = None
+
+    # =====================================
     # Future Expansion
     # =====================================
 
     perception: object | None = None
     vision: object | None = None
     voice: object | None = None
-    action: object | None = None
+
+    # =====================================
+    # Deliberation
+    # =====================================
+
+    deliberation: object | None = None

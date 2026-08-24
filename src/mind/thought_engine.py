@@ -24,62 +24,166 @@ class ThoughtEngine(BaseModule):
         self.client = OllamaClient()
 
     def start(self):
+
         Logger.info("Thought Engine Started")
 
     def update(self):
         pass
 
     def stop(self):
+
         Logger.info("Thought Engine Stopped")
 
-    # -------------------------------------------------
-    # Prompt
     # -------------------------------------------------
 
     def _build_prompt(self, state):
 
-        memory = "\n".join(state.long_memory)
+        observation = ""
 
-        if not memory:
-            memory = "없음"
+        if state.observation:
+
+            observation = state.observation.content
+
+        # Working Memory
+
+        working = []
+
+        for item in state.working_memory:
+
+            try:
+                working.append(item.content)
+            except:
+                working.append(str(item))
+
+        working = "\n".join(working)
+
+        if not working:
+
+            working = "없음"
+
+        # Long Memory
+
+        long_memory = []
+
+        for item in state.long_memory:
+
+            long_memory.append(str(item))
+
+        long_memory = "\n".join(long_memory)
+
+        if not long_memory:
+
+            long_memory = "없음"
+
+        # Conversation
+
+        history = []
+
+        for msg in state.conversation[-6:]:
+
+            try:
+
+                history.append(
+                    f"{msg['role']} : {msg['content']}"
+                )
+
+            except:
+
+                history.append(str(msg))
+
+        history = "\n".join(history)
+
+        if not history:
+
+            history = "없음"
+
+        # Emotion
+
+        emotion = state.self_model.emotion
 
         return f"""
 너는 LUCID의 Thought Engine이다.
 
-사용자의 입력과 기억을 참고하여
-AI 내부에서 현재 가장 적절한 생각을 만든다.
+목표
 
-========================
+사용자의 입력을 보고
+
+AI 내부에서 가장 적절한 생각을 만든다.
+
+감정
+
+기억
+
+최근 대화
+
+추론 결과를 모두 고려한다.
+
+================================
+
 사용자 입력
-========================
 
-{state.observation.content}
+{observation}
 
-========================
+================================
+
 Reason
-========================
 
 Intent : {state.reason.intent}
 
 Summary : {state.reason.summary}
 
-========================
-Long Memory
-========================
+================================
 
-{memory}
+최근 대화
+
+{history}
+
+================================
+
+Working Memory
+
+{working}
+
+================================
+
+Long Memory
+
+{long_memory}
+
+================================
+
+현재 감정
+
+Joy : {emotion.joy:.2f}
+
+Curiosity : {emotion.curiosity:.2f}
+
+Confidence : {emotion.confidence:.2f}
+
+Sadness : {emotion.sadness:.2f}
+
+Anger : {emotion.anger:.2f}
+
+Fear : {emotion.fear:.2f}
+
+Fatigue : {emotion.fatigue:.2f}
+
+================================
 
 반드시 아래 형식만 출력한다.
 
 Thought:
+
 Importance:
 """
 
     # -------------------------------------------------
-    # Parse
-    # -------------------------------------------------
 
-    def _parse_response(self, reply, default_importance):
+    def _parse_response(
+        self,
+        reply,
+        default_importance,
+    ):
 
         thought = "생각을 정리한다."
 
@@ -101,13 +205,12 @@ Importance:
                         line.split(":", 1)[1].strip()
                     )
 
-                except ValueError:
+                except:
+
                     pass
 
         return thought, importance
 
-    # -------------------------------------------------
-    # Process
     # -------------------------------------------------
 
     def process(self, state):
@@ -137,6 +240,7 @@ Importance:
             Logger.error(f"Thought Error : {e}")
 
             thought_text = state.reason.summary
+
             importance = state.reason.confidence
 
         thought = Thought(
