@@ -47,6 +47,21 @@ class LongTermMemory:
             """
         )
 
+        self.cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS inner_experiences(
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                meaning TEXT NOT NULL,
+                trigger_text TEXT NOT NULL,
+                tendency TEXT NOT NULL,
+                persistence TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
         self.db.commit()
 
         # ==========================================
@@ -233,6 +248,92 @@ class LongTermMemory:
             )
 
             return 0
+
+    # ==========================================
+    # Inner Life
+    # ==========================================
+
+    def store_inner_experience(self, experience):
+        """Persist an autonomous inner experience separately from user memory."""
+
+        try:
+
+            self.cursor.execute(
+                """
+                INSERT INTO inner_experiences
+                (
+                    name,
+                    meaning,
+                    trigger_text,
+                    tendency,
+                    persistence,
+                    created_at
+                )
+                VALUES(?,?,?,?,?,?)
+                """,
+                (
+                    experience.name,
+                    experience.meaning,
+                    experience.trigger,
+                    experience.tendency,
+                    experience.persistence,
+                    experience.created_at.isoformat(),
+                ),
+            )
+
+            self.db.commit()
+
+            Logger.info(
+                f"[Inner Life] Stored : {experience.name}"
+            )
+
+        except Exception as e:
+
+            Logger.error(
+                f"[Inner Life] Store Error : {e}"
+            )
+
+    def recent_inner_experiences(self, limit=12):
+
+        try:
+
+            self.cursor.execute(
+                """
+                SELECT
+                    name,
+                    meaning,
+                    trigger_text,
+                    tendency,
+                    persistence,
+                    created_at
+                FROM inner_experiences
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+
+            rows = self.cursor.fetchall()
+
+            return [
+                {
+                    "name": row[0],
+                    "meaning": row[1],
+                    "trigger": row[2],
+                    "tendency": row[3],
+                    "persistence": row[4],
+                    "created_at": row[5],
+                }
+                for row in reversed(rows)
+            ]
+
+        except Exception as e:
+
+            Logger.error(
+                f"[Inner Life] Load Error : {e}"
+            )
+
+            return []
 
     # ==========================================
     # Close

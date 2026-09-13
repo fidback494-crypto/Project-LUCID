@@ -13,6 +13,7 @@ from src.action.tools.time_tool import TimeTool
 from src.action.action_engine import ActionEngine
 from src.workspace.workspace_engine import WorkspaceEngine
 from src.emotion.emotion_engine import EmotionEngine
+from src.autonomy.autonomous_engine import AutonomousEngine
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -116,6 +117,10 @@ class LucidEngine:
         # ============================
 
         self.emotion = EmotionEngine()
+        self.autonomy = AutonomousEngine(
+            self.self_model,
+            self.long_memory,
+        )
 
         # ============================
         # Mind
@@ -204,6 +209,7 @@ class LucidEngine:
         self.kernel.register(self.memory)
 
         self.kernel.register(self.emotion)
+        self.kernel.register(self.autonomy)
 
         self.kernel.register(self.reasoning)
         self.kernel.register(self.goal)
@@ -278,6 +284,8 @@ class LucidEngine:
                 reply = self.life.process(user)
 
                 print(f"\nLUCID > {reply}")
+
+                self.autonomy.note_interaction()
 
             except KeyboardInterrupt:
 
