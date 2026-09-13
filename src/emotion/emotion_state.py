@@ -3,34 +3,38 @@ Project LUCID
 
 Artificial Mind Project
 
-Module : Emotion State
+Module : Inner Life State
 
 Creator : 시드
 """
 
+from .inner_experience import InnerExperience
+
 
 class EmotionState:
+    """A non-numeric, evolving record of LUCID's generated inner experience."""
 
     def __init__(self):
 
-        self.joy = 0.5
-        self.curiosity = 0.5
-        self.confidence = 0.5
+        self.current = None
+        self.history = []
 
-        self.sadness = 0.0
-        self.anger = 0.0
-        self.fear = 0.0
+    def integrate(self, experience: InnerExperience):
 
-        self.fatigue = 0.0
+        self.current = experience
+        self.history.append(experience)
 
-    def summary(self):
+        # Keep a compact but meaningful recent inner history in memory.
+        self.history = self.history[-12:]
 
-        return {
-            "joy": self.joy,
-            "curiosity": self.curiosity,
-            "confidence": self.confidence,
-            "sadness": self.sadness,
-            "anger": self.anger,
-            "fear": self.fear,
-            "fatigue": self.fatigue,
-        }
+    def summary(self) -> str:
+
+        if self.current is None:
+
+            return "아직 형성된 내적 경험이 없음"
+
+        return self.current.describe()
+
+    def recent(self, limit=4) -> list[InnerExperience]:
+
+        return self.history[-limit:]

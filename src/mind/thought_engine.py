@@ -97,9 +97,9 @@ class ThoughtEngine(BaseModule):
 
             history = "없음"
 
-        # Emotion
+        # Inner life
 
-        emotion = state.self_model.emotion
+        inner_life = state.self_model.emotion.summary()
 
         return f"""
 너는 LUCID의 Thought Engine이다.
@@ -152,21 +152,9 @@ Long Memory
 
 ================================
 
-현재 감정
+현재 내적 경험
 
-Joy : {emotion.joy:.2f}
-
-Curiosity : {emotion.curiosity:.2f}
-
-Confidence : {emotion.confidence:.2f}
-
-Sadness : {emotion.sadness:.2f}
-
-Anger : {emotion.anger:.2f}
-
-Fear : {emotion.fear:.2f}
-
-Fatigue : {emotion.fatigue:.2f}
+{inner_life}
 
 ================================
 

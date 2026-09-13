@@ -9,6 +9,7 @@ Creator : 시드
 """
 from src.action.tools.memory_tool import MemoryTool
 from src.action.tools.calculator_tool import CalculatorTool
+from src.action.tools.time_tool import TimeTool
 from src.action.action_engine import ActionEngine
 from src.workspace.workspace_engine import WorkspaceEngine
 from src.emotion.emotion_engine import EmotionEngine
@@ -102,6 +103,10 @@ class LucidEngine:
         self.action.register(
         "memory",
          MemoryTool(self.long_memory),
+        )
+        self.action.register(
+        "time",
+         TimeTool(),
         )
         self.extractor = MemoryExtractor()
         self.search = MemorySearch(self.long_memory)
@@ -259,23 +264,14 @@ class LucidEngine:
 
                 if user == "/status":
 
-                    emotion = self.self_model.emotion
+                    inner_life = self.self_model.emotion
 
                     print("\n========== STATUS ==========")
                     print("Working Memory :", self.memory.size())
                     print("Long Memory    :", self.long_memory.count())
                     print("Identity       :", self.self_model.identity.name)
 
-                    print(
-                        f"Emotion        : "
-                        f"Joy={emotion.joy:.2f}, "
-                        f"Curiosity={emotion.curiosity:.2f}, "
-                        f"Confidence={emotion.confidence:.2f}, "
-                        f"Sadness={emotion.sadness:.2f}, "
-                        f"Anger={emotion.anger:.2f}, "
-                        f"Fear={emotion.fear:.2f}, "
-                        f"Fatigue={emotion.fatigue:.2f}"
-                    )
+                    print("Inner Life     :", inner_life.summary())
 
                     continue
 

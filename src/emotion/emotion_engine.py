@@ -15,6 +15,7 @@ from src.language.ollama_client import OllamaClient
 
 from .emotion_prompt import EmotionPrompt
 from .emotion_state import EmotionState
+from .inner_experience import InnerExperience
 
 
 class EmotionEngine(BaseModule):
@@ -46,13 +47,15 @@ class EmotionEngine(BaseModule):
             }
         ]
 
-        emotion = state.self_model.emotion
+        inner_life = state.self_model.emotion
 
         try:
 
             reply = self.client.generate(messages)
 
             Logger.info(f"[Emotion LLM]\n{reply}")
+
+            fields = {}
 
             for line in reply.splitlines():
 
@@ -62,54 +65,33 @@ class EmotionEngine(BaseModule):
                     continue
 
                 key, value = line.split(":", 1)
+                fields[key.strip().lower()] = value.strip()
 
-                key = key.strip().lower()
+            experience = InnerExperience(
+                name=fields.get("experience", "정리되지 않은 반향"),
+                meaning=fields.get(
+                    "meaning",
+                    "현재 상황의 의미를 더 살펴보려는 내적 움직임",
+                ),
+                trigger=fields.get("trigger", state.observation.content),
+                tendency=fields.get(
+                    "tendency",
+                    "상황을 이해하기 위해 차분히 관찰함",
+                ),
+                persistence=fields.get("persistence", "잠시 머묾"),
+            )
 
-                value = value.strip()
-
-                if key == "joy":
-
-                    emotion.joy = float(value)
-
-                elif key == "curiosity":
-
-                    emotion.curiosity = float(value)
-
-                elif key == "confidence":
-
-                    emotion.confidence = float(value)
-
-                elif key == "sadness":
-
-                    emotion.sadness = float(value)
-
-                elif key == "anger":
-
-                    emotion.anger = float(value)
-
-                elif key == "fear":
-
-                    emotion.fear = float(value)
-
-                elif key == "fatigue":
-
-                    emotion.fatigue = float(value)
-
-                elif key == "reason":
-
-                    Logger.info(f"[Emotion Reason] {value}")
+            inner_life.integrate(experience)
 
         except Exception as e:
 
             Logger.error(f"Emotion Error : {e}")
 
-        state.self_model.emotion = emotion
+        state.self_model.emotion = inner_life
 
         Logger.info(
-            "[Emotion] "
-            f"Joy={emotion.joy:.2f} "
-            f"Curiosity={emotion.curiosity:.2f} "
-            f"Confidence={emotion.confidence:.2f}"
+            "[Inner Life] "
+            f"{inner_life.summary()}"
         )
 
-        return emotion
+        return inner_life

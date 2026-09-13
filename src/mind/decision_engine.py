@@ -47,10 +47,27 @@ class DecisionEngine(BaseModule):
         text = state.observation.content.lower()
 
         # -----------------------------------------
-        # Calculator
+        # Time
         # -----------------------------------------
 
         if (
+            "몇 시" in text
+            or "몇시" in text
+            or "현재 시간" in text
+            or "지금 시간" in text
+            or "오늘 날짜" in text
+            or "오늘 며칠" in text
+        ):
+
+            action.need_action = True
+            action.tool = "time"
+            action.command = state.observation.content
+
+        # -----------------------------------------
+        # Calculator
+        # -----------------------------------------
+
+        elif (
             "계산" in text
             or "+" in text
             or "-" in text

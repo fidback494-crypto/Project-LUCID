@@ -80,10 +80,10 @@ class ReasoningPrompt:
             history = "없음"
 
         # ---------------------------------
-        # Emotion
+        # Inner life
         # ---------------------------------
 
-        emotion = state.self_model.emotion
+        inner_life = state.self_model.emotion.summary()
 
         # ---------------------------------
         # Prompt
@@ -134,21 +134,9 @@ Long Memory
 
 ====================================
 
-현재 감정
+현재 내적 경험
 
-Joy : {emotion.joy:.2f}
-
-Curiosity : {emotion.curiosity:.2f}
-
-Confidence : {emotion.confidence:.2f}
-
-Sadness : {emotion.sadness:.2f}
-
-Anger : {emotion.anger:.2f}
-
-Fear : {emotion.fear:.2f}
-
-Fatigue : {emotion.fatigue:.2f}
+{inner_life}
 
 ====================================
 

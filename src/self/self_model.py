@@ -52,12 +52,6 @@ class SelfModel:
             "focus": self.attention.target,
             "curiosity": self.needs.curiosity,
 
-            # Emotion
-            "joy": self.emotion.joy,
-            "confidence": self.emotion.confidence,
-            "emotion_curiosity": self.emotion.curiosity,
-            "sadness": self.emotion.sadness,
-            "anger": self.emotion.anger,
-            "fear": self.emotion.fear,
-            "fatigue": self.emotion.fatigue,
+            # Inner life
+            "inner_life": self.emotion.summary(),
         }
