@@ -62,6 +62,21 @@ class LongTermMemory:
             """
         )
 
+        self.cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS autonomous_goals(
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                interest TEXT NOT NULL,
+                title TEXT NOT NULL,
+                rationale TEXT NOT NULL,
+                next_attention TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
         self.db.commit()
 
         # ==========================================
@@ -334,6 +349,90 @@ class LongTermMemory:
             )
 
             return []
+
+    # ==========================================
+    # Autonomous Goals
+    # ==========================================
+
+    def set_autonomous_goal(self, goal):
+        """Keep one current self-generated goal while preserving prior goals."""
+
+        try:
+
+            self.cursor.execute(
+                "UPDATE autonomous_goals SET active = 0 WHERE active = 1"
+            )
+
+            self.cursor.execute(
+                """
+                INSERT INTO autonomous_goals
+                (
+                    interest,
+                    title,
+                    rationale,
+                    next_attention,
+                    active,
+                    created_at
+                )
+                VALUES(?,?,?,?,?,?)
+                """,
+                (
+                    goal.interest,
+                    goal.title,
+                    goal.rationale,
+                    goal.next_attention,
+                    1,
+                    goal.created_at.isoformat(),
+                ),
+            )
+
+            self.db.commit()
+
+            Logger.info(
+                f"[Autonomy] Goal Stored : {goal.title}"
+            )
+
+        except Exception as e:
+
+            Logger.error(
+                f"[Autonomy] Goal Store Error : {e}"
+            )
+
+    def active_autonomous_goal(self):
+
+        try:
+
+            self.cursor.execute(
+                """
+                SELECT interest, title, rationale, next_attention, created_at
+                FROM autonomous_goals
+                WHERE active = 1
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            )
+
+            row = self.cursor.fetchone()
+
+            if row is None:
+
+                return None
+
+            return {
+                "interest": row[0],
+                "title": row[1],
+                "rationale": row[2],
+                "next_attention": row[3],
+                "created_at": row[4],
+            }
+
+        except Exception as e:
+
+            Logger.error(
+                f"[Autonomy] Goal Load Error : {e}"
+            )
+
+            return None
 
     # ==========================================
     # Close

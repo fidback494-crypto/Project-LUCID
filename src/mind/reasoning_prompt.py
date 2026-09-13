@@ -85,6 +85,12 @@ class ReasoningPrompt:
 
         inner_life = state.self_model.emotion.summary()
 
+        autonomous_goal = (
+            state.self_model.autonomous_goal.describe()
+            if state.self_model.autonomous_goal is not None
+            else "없음"
+        )
+
         # ---------------------------------
         # Prompt
         # ---------------------------------
@@ -137,6 +143,14 @@ Long Memory
 현재 내적 경험
 
 {inner_life}
+
+====================================
+
+지속 관심과 자율 목표
+
+{autonomous_goal}
+
+이 목표는 배경 맥락일 뿐이며 사용자의 현재 요청보다 우선하지 않는다.
 
 ====================================
 

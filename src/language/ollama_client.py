@@ -22,7 +22,7 @@ class OllamaClient:
         # =========================================
 
         self.base_url = (
-            "https://pet-provided-bookmarks-stomach.trycloudflare.com"
+            "https://telecharger-sphere-karaoke-properly.trycloudflare.com"
         )
 
         self.api_url = f"{self.base_url}/api/chat"

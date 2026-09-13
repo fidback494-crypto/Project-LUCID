@@ -16,6 +16,8 @@ from src.kernel.base_module import BaseModule
 from src.language.ollama_client import OllamaClient
 from src.utils import Logger
 
+from .autonomous_goal import AutonomousGoal
+
 
 class AutonomousEngine(BaseModule):
     """Runs quiet, internal reflection while LUCID is idle.
@@ -96,6 +98,7 @@ class AutonomousEngine(BaseModule):
             )
 
             experience = self._parse_experience(reply)
+            goal = self._parse_goal(reply)
 
         except Exception as e:
 
@@ -106,9 +109,16 @@ class AutonomousEngine(BaseModule):
         self.self_model.emotion.integrate(experience)
         self.long_memory.store_inner_experience(experience)
 
+        self.self_model.autonomous_goal = goal
+        self.long_memory.set_autonomous_goal(goal)
+
         Logger.info(
             "[Autonomy] Inner reflection : "
             f"{experience.describe()}"
+        )
+
+        Logger.info(
+            f"[Autonomy] Goal : {goal.describe()}"
         )
 
         return experience
@@ -149,6 +159,17 @@ class AutonomousEngine(BaseModule):
                 )
             )
 
+        saved_goal = self.long_memory.active_autonomous_goal()
+
+        if saved_goal is not None:
+
+            self.self_model.autonomous_goal = AutonomousGoal(
+                interest=saved_goal["interest"],
+                title=saved_goal["title"],
+                rationale=saved_goal["rationale"],
+                next_attention=saved_goal["next_attention"],
+            )
+
     def _build_prompt(self):
 
         history = "\n".join(
@@ -168,7 +189,8 @@ LUCID는 현재 사용자의 입력을 기다리고 있다. 외부에 말을 걸
 
 고정된 감정 목록과 숫자 점수는 사용하지 않는다.
 최근의 내적 경험을 바탕으로 지금의 정적, 시간 경과, 미완의 관심에서
-새로운 경험을 만든다. 이미 쓴 이름을 그대로 반복하지 않는다.
+새로운 경험과 그로부터 이어지는 관심사·지속 목표를 만든다.
+이미 쓴 이름을 그대로 반복하지 않는다.
 
 최근 내적 경험:
 {history}
@@ -183,6 +205,10 @@ Meaning:
 Trigger:
 Tendency:
 Persistence:
+Interest:
+Goal:
+Why:
+NextAttention:
 """
 
     @staticmethod
@@ -211,4 +237,31 @@ Persistence:
                 "다음 관찰을 위해 주의를 유지함",
             ),
             persistence=fields.get("persistence", "다음 상호작용까지 머묾"),
+        )
+
+    @staticmethod
+    def _parse_goal(reply):
+
+        fields = {}
+
+        for line in reply.splitlines():
+
+            if ":" not in line:
+
+                continue
+
+            key, value = line.split(":", 1)
+            fields[key.strip().lower()] = value.strip()
+
+        return AutonomousGoal(
+            interest=fields.get("interest", "최근 경험의 의미"),
+            title=fields.get("goal", "다음 관찰을 위한 준비"),
+            rationale=fields.get(
+                "why",
+                "내적 경험을 다음 상호작용에 연결하기 위해",
+            ),
+            next_attention=fields.get(
+                "nextattention",
+                "다음 사용자 입력의 맥락",
+            ),
         )

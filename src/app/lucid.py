@@ -280,6 +280,22 @@ class LucidEngine:
 
                     continue
 
+                if user == "/goal":
+
+                    print("\n========== Autonomous Goal ==========")
+
+                    goal = self.self_model.autonomous_goal
+
+                    if goal is None:
+
+                        print("아직 형성된 자율 목표가 없습니다.")
+
+                    else:
+
+                        print(goal.describe())
+
+                    continue
+
                 if user == "/working":
 
                     print("\n========== Working Memory ==========")

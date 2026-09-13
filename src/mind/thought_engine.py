@@ -101,6 +101,12 @@ class ThoughtEngine(BaseModule):
 
         inner_life = state.self_model.emotion.summary()
 
+        autonomous_goal = (
+            state.self_model.autonomous_goal.describe()
+            if state.self_model.autonomous_goal is not None
+            else "없음"
+        )
+
         return f"""
 너는 LUCID의 Thought Engine이다.
 
@@ -155,6 +161,14 @@ Long Memory
 현재 내적 경험
 
 {inner_life}
+
+================================
+
+지속 관심과 자율 목표
+
+{autonomous_goal}
+
+사용자의 현재 요청이 항상 우선이다.
 
 ================================
 

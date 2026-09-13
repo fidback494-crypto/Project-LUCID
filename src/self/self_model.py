@@ -43,6 +43,9 @@ class SelfModel:
 
         self.emotion = EmotionState()
 
+        # Self-generated direction; never overrides the user's current request.
+        self.autonomous_goal = None
+
     def status(self):
 
         return {
@@ -54,4 +57,9 @@ class SelfModel:
 
             # Inner life
             "inner_life": self.emotion.summary(),
+            "autonomous_goal": (
+                self.autonomous_goal.describe()
+                if self.autonomous_goal is not None
+                else "없음"
+            ),
         }
