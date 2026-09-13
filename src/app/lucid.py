@@ -259,6 +259,27 @@ class LucidEngine:
 
                     continue
 
+                if user == "/inner":
+
+                    print("\n========== Inner Life ==========")
+
+                    experiences = (
+                        self.long_memory.recent_inner_experiences()
+                    )
+
+                    if not experiences:
+
+                        print("아직 기록된 자율 내적 경험이 없습니다.")
+
+                    for experience in experiences:
+
+                        print(
+                            f"- {experience['name']}: "
+                            f"{experience['meaning']}"
+                        )
+
+                    continue
+
                 if user == "/working":
 
                     print("\n========== Working Memory ==========")
