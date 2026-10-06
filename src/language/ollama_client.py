@@ -8,6 +8,8 @@ Module : Ollama Client
 Creator : 시드
 """
 
+import os
+
 import requests
 
 from src.utils import Logger
@@ -18,24 +20,35 @@ class OllamaClient:
     def __init__(self):
 
         # =========================================
-        # Google Colab Ollama
+        # Ollama endpoint
+        #
+        # A local Ollama server is the portable default. Set
+        # LUCID_OLLAMA_URL to use a remote server or a temporary tunnel.
         # =========================================
 
         self.base_url = (
-            "https://telecharger-sphere-karaoke-properly.trycloudflare.com"
+            os.getenv(
+                "LUCID_OLLAMA_URL",
+                "http://127.0.0.1:11434",
+            ).rstrip("/")
         )
 
         self.api_url = f"{self.base_url}/api/chat"
 
         self.generate_url = f"{self.base_url}/api/generate"
 
-        self.timeout = 300
+        self.timeout = int(
+            os.getenv("LUCID_OLLAMA_TIMEOUT", "300")
+        )
 
         # =========================================
         # Model
         # =========================================
 
-        self.model = "qwen2.5:3b"
+        self.model = os.getenv(
+            "LUCID_OLLAMA_MODEL",
+            "qwen2.5:3b",
+        )
 
     # =============================================
     # Connection Test

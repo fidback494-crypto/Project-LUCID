@@ -8,8 +8,10 @@ Module : Long Term Memory
 Creator : 시드
 """
 
+import os
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 from src.utils import Logger
 from .memory_record import MemoryRecord
@@ -19,8 +21,19 @@ class LongTermMemory:
 
     def __init__(self):
 
+        project_root = Path(__file__).resolve().parents[2]
+        data_directory = Path(
+            os.getenv(
+                "LUCID_DATA_DIR",
+                project_root / "data",
+            )
+        )
+        data_directory.mkdir(parents=True, exist_ok=True)
+
+        self.db_path = data_directory / "lucid_memory.db"
+
         self.db = sqlite3.connect(
-            "lucid_memory.db",
+            self.db_path,
             check_same_thread=False,
         )
 

@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-LUCID local data
+lucid_memory.db
+data/*.db
