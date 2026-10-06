@@ -14,6 +14,7 @@ from src.action.action_engine import ActionEngine
 from src.workspace.workspace_engine import WorkspaceEngine
 from src.emotion.emotion_engine import EmotionEngine
 from src.autonomy.autonomous_engine import AutonomousEngine
+from src.cognitive.cognitive_engine import CognitiveEngine
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -117,6 +118,7 @@ class LucidEngine:
         # ============================
 
         self.emotion = EmotionEngine()
+        self.cognitive = CognitiveEngine()
         self.autonomy = AutonomousEngine(
             self.self_model,
             self.long_memory,
@@ -188,8 +190,9 @@ class LucidEngine:
 
          search=self.search,
 
-          workspace_engine=self.workspace,   # ← 추가
+         workspace_engine=self.workspace,   # ← 추가
          action_engine=self.action,
+         cognitive_engine=self.cognitive,
            )
 
         self.running = False
@@ -209,6 +212,7 @@ class LucidEngine:
         self.kernel.register(self.memory)
 
         self.kernel.register(self.emotion)
+        self.kernel.register(self.cognitive)
         self.kernel.register(self.autonomy)
 
         self.kernel.register(self.reasoning)

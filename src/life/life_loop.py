@@ -34,6 +34,7 @@ class LifeLoop:
         search,
         workspace_engine,
         action_engine,
+        cognitive_engine,
     ):
 
         self.observation = observation_engine
@@ -57,6 +58,7 @@ class LifeLoop:
 
         self.workspace = workspace_engine
         self.action = action_engine
+        self.cognitive = cognitive_engine
 
     # =================================================
     # Process
@@ -137,57 +139,9 @@ class LifeLoop:
         workspace.long_memory = state.long_memory
 
         # =================================================
-        # Emotion
-        # =================================================
-
-        state.emotion = self.emotion.process(
-            state
-        )
-
-        workspace.emotion = state.emotion
-
-        # =================================================
-        # Reason
-        # =================================================
-
-        state.reason = self.reasoning.process(
-            state
-        )
-
-        workspace.reason = state.reason
-
-        # =================================================
-        # Thought
-        # =================================================
-
-        state.thought = self.thought.process(
-            state
-        )
-
-        workspace.thought = state.thought
-
-        # =================================================
-        # Goal
-        # =================================================
-
-        state.goal = self.goal.process(
-            state
-        )
-
-        workspace.goal = state.goal
-
-        # =================================================
-        # Planning
-        # =================================================
-
-        state.plan = self.planning.process(
-            state
-        )
-
-        workspace.plan = state.plan
-
-        # =================================================
-        # Decision
+        # Decision and Action
+        #
+        # Tool selection is rule-based so it does not require an LLM call.
         # =================================================
 
         state.decision = self.decision.process(
@@ -223,14 +177,26 @@ class LifeLoop:
             )
 
         # =================================================
-        # Language
+        # Unified Cognitive Cycle
+        #
+        # One LLM call creates inner experience, reasoning, thought, plan,
+        # and the final response after any action result is available.
         # =================================================
 
-        state.response = self.language.process(
-            state
-        )
+        state.response = self.cognitive.process(state)
 
         workspace.response = state.response
+        workspace.emotion = state.emotion
+        workspace.reason = state.reason
+        workspace.thought = state.thought
+        workspace.goal = state.goal
+        workspace.plan = state.plan
+
+        if state.emotion.current is not None:
+
+            self.long_memory.store_inner_experience(
+                state.emotion.current
+            )
 
         # =================================================
         # Conversation Update

@@ -36,10 +36,18 @@ class DecisionEngine(BaseModule):
 
     def process(self, state):
 
+        plan = getattr(state, "plan", None)
+
         decision = Decision(
             action="respond",
-            reason=state.plan.goal,
-            confidence=state.plan.priority,
+            reason=(
+                plan.goal if plan is not None
+                else "사용자 입력에 반응"
+            ),
+            confidence=(
+                plan.priority if plan is not None
+                else 0.8
+            ),
         )
 
         action = Action()
