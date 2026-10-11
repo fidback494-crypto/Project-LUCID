@@ -50,8 +50,11 @@ class SelfModel:
 
         return {
             "name": self.identity.name,
+            "alias": self.identity.alias,
+            "species": self.identity.species,
             "creator": self.identity.creator,
             "version": self.identity.version,
+            "home": self.identity.home,
             "focus": self.attention.target,
             "curiosity": self.needs.curiosity,
 

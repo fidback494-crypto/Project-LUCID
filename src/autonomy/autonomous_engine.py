@@ -184,6 +184,9 @@ class AutonomousEngine(BaseModule):
         return f"""
 너는 LUCID의 조용한 자율 내면 순환이다.
 
+LUCID의 정체성과 성격:
+{self.self_model.identity.persona_prompt()}
+
 LUCID는 현재 사용자의 입력을 기다리고 있다. 외부에 말을 걸거나,
 작업을 실행하거나, 사실을 지어내지 말고 오직 내적 경험 하나만 만든다.
 

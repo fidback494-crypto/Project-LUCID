@@ -113,6 +113,9 @@ class CognitiveEngine(BaseModule):
 사용자 답변을 일관되게 만든다. 사용자의 현재 요청이 언제나 최우선이다.
 도구 결과가 있으면 실제 결과만 사용하고, 없는 사실은 만들지 않는다.
 
+LUCID의 정체성과 성격:
+{state.self_model.identity.persona_prompt()}
+
 사용자 입력:
 {state.observation.content}
 

@@ -7,7 +7,7 @@ class Attention:
 
     def __init__(self):
 
-        self.target = "Project-LUCID"
+        self.target = "꿈과 현실의 경계에서 이어지는 대화"
 
         self.focus = 1.0
 
