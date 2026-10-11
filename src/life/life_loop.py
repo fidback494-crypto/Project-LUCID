@@ -35,6 +35,7 @@ class LifeLoop:
         workspace_engine,
         action_engine,
         cognitive_engine,
+        browser_context_store=None,
     ):
 
         self.observation = observation_engine
@@ -59,6 +60,7 @@ class LifeLoop:
         self.workspace = workspace_engine
         self.action = action_engine
         self.cognitive = cognitive_engine
+        self.browser_context_store = browser_context_store
 
     # =================================================
     # Process
@@ -99,6 +101,11 @@ class LifeLoop:
         state.conversation = self.conversation.messages()
 
         workspace.conversation = state.conversation
+
+        # Browser context is opt-in: it exists only after the user shares a
+        # page through the local browser extension.
+        if self.browser_context_store is not None:
+            state.web_context = self.browser_context_store.prompt_context()
 
         # =================================================
         # Working Memory

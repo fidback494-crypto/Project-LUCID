@@ -220,3 +220,4 @@ __marimo__/
 # Project-LUCID local data
 lucid_memory.db
 data/*.db
+data/browser_bridge_token.txt

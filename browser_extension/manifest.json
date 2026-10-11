@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "LUCID Page Share",
+  "version": "0.1.0",
+  "description": "Share the active page with a local LUCID instance only when requested.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "action": {
+    "default_title": "Share this page with LUCID",
+    "default_popup": "popup.html"
+  }
+}

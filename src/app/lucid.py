@@ -15,6 +15,7 @@ from src.workspace.workspace_engine import WorkspaceEngine
 from src.emotion.emotion_engine import EmotionEngine
 from src.autonomy.autonomous_engine import AutonomousEngine
 from src.cognitive.cognitive_engine import CognitiveEngine
+from src.browser import BrowserBridge, PageContextStore
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -112,6 +113,8 @@ class LucidEngine:
 
         self.emotion = EmotionEngine()
         self.cognitive = CognitiveEngine()
+        self.browser_context = PageContextStore()
+        self.browser_bridge = BrowserBridge(self.browser_context)
         self.autonomy = AutonomousEngine(
             self.self_model,
             self.long_memory,
@@ -186,6 +189,7 @@ class LucidEngine:
          workspace_engine=self.workspace,   # ← 추가
          action_engine=self.action,
          cognitive_engine=self.cognitive,
+         browser_context_store=self.browser_context,
            )
 
         self.running = False
@@ -220,6 +224,7 @@ class LucidEngine:
         self.kernel.register(self.experience)
 
         self.kernel.start()
+        self.browser_bridge.start()
 
         self.running = True
 
@@ -315,6 +320,52 @@ class LucidEngine:
 
                     continue
 
+                if user == "/page":
+
+                    page = self.browser_context.latest()
+
+                    if page is None:
+                        print(
+                            "\n아직 공유된 웹페이지가 없어. 브라우저 확장의 "
+                            "‘현재 페이지 공유’ 버튼을 눌러 줘."
+                        )
+
+                    else:
+                        print("\n========== Shared Page ==========")
+                        print("Title :", page.title or "(제목 없음)")
+                        print("URL   :", page.url)
+                        print("Selected text :", page.selection or "(없음)")
+
+                    continue
+
+                if user.startswith("/page "):
+
+                    question = user.removeprefix("/page ").strip()
+
+                    if self.browser_context.latest() is None:
+                        print("\n먼저 브라우저에서 페이지를 공유해 줘.")
+                        continue
+
+                    if not question:
+                        print("\n예: /page 이 글의 핵심 내용이 뭐야?")
+                        continue
+
+                    user = (
+                        "사용자가 공유한 현재 웹페이지의 내용만 바탕으로 답해 줘. "
+                        f"질문: {question}"
+                    )
+
+                if user == "/page-think":
+
+                    if self.browser_context.latest() is None:
+                        print("\n먼저 브라우저에서 페이지를 공유해 줘.")
+                        continue
+
+                    user = (
+                        "사용자가 공유한 현재 웹페이지를 보고, 사실을 꾸며내지 말고 "
+                        "LUCID로서 짧은 혼잣말을 해 줘."
+                    )
+
                 reply = self.life.process(user)
 
                 print(f"\nLUCID > {reply}")
@@ -335,5 +386,6 @@ class LucidEngine:
         Logger.info("Shutting Down...")
 
         self.kernel.stop()
+        self.browser_bridge.stop()
 
         self.running = False

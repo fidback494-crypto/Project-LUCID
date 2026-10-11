@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: sans-serif; margin: 14px; width: 280px; }
+      label, input, button { display: block; width: 100%; box-sizing: border-box; }
+      input { margin: 6px 0 10px; }
+      button { padding: 8px; }
+      #status { margin-top: 10px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <label for="token">LUCID 연결 토큰</label>
+    <input id="token" type="password" placeholder="LUCID 콘솔에 표시된 토큰">
+    <button id="share">현재 페이지 공유</button>
+    <div id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>

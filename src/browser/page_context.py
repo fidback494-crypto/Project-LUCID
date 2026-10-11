@@ -1,0 +1,55 @@
+"""The most recently user-shared browser page."""
+
+from dataclasses import dataclass
+from datetime import datetime
+from threading import Lock
+
+
+@dataclass(frozen=True)
+class PageContext:
+    title: str
+    url: str
+    text: str
+    selection: str
+    received_at: datetime
+
+    def prompt_context(self, limit=8000):
+        body = self.text[:limit]
+        selected = self.selection[:2000]
+
+        return (
+            f"제목: {self.title}\n"
+            f"주소: {self.url}\n"
+            f"사용자가 선택한 텍스트: {selected or '없음'}\n"
+            f"페이지 본문 일부:\n{body or '없음'}"
+        )
+
+
+class PageContextStore:
+    """Thread-safe storage populated only by the paired local extension."""
+
+    def __init__(self):
+        self._lock = Lock()
+        self._latest = None
+
+    def update(self, *, title, url, text, selection=""):
+        context = PageContext(
+            title=str(title).strip()[:500],
+            url=str(url).strip()[:2000],
+            text=str(text).strip()[:16000],
+            selection=str(selection).strip()[:4000],
+            received_at=datetime.now(),
+        )
+
+        with self._lock:
+            self._latest = context
+
+        return context
+
+    def latest(self):
+        with self._lock:
+            return self._latest
+
+    def prompt_context(self):
+        context = self.latest()
+        return context.prompt_context() if context else "없음"

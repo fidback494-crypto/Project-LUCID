@@ -48,6 +48,7 @@ class BrainState:
 
     working_memory: list = field(default_factory=list)
     long_memory: list = field(default_factory=list)
+    web_context: str = ""
 
     # =====================================
     # Learning
