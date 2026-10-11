@@ -68,7 +68,7 @@ class BrowserBridge:
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
 
-                    if length <= 0 or length > 25000:
+                    if length <= 0 or length > 7000000:
                         raise ValueError("invalid payload size")
 
                     payload = json.loads(self.rfile.read(length))
@@ -80,11 +80,18 @@ class BrowserBridge:
                         self.wfile.write(b'{"error":"invalid token"}')
                         return
 
+                    image_base64 = str(payload.get("image_base64", ""))
+
+                    if len(image_base64) > 6500000:
+                        raise ValueError("image is too large")
+
                     context = bridge.store.update(
                         title=payload.get("title", ""),
                         url=payload.get("url", ""),
                         text=payload.get("text", ""),
                         selection=payload.get("selection", ""),
+                        image_base64=image_base64,
+                        image_mime=payload.get("image_mime", "image/jpeg"),
                     )
                     Logger.info(
                         f"[Browser] Page shared: {context.title or context.url}"

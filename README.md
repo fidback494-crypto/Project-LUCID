@@ -67,3 +67,29 @@ LUCID는 사용자가 명시적으로 공유한 현재 브라우저 탭의 내�
 /page 이 글의 핵심은 뭐야?     페이지를 바탕으로 질문하기
 /page-think                   페이지를 보고 LUCID의 짧은 혼잣말 듣기
 ```
+
+## 화면·창을 비전 모델로 보기
+
+화면 캡처를 이해하려면 Ollama 서버에 비전 모델을 한 번 설치해야 합니다.
+
+```bash
+ollama pull gemma3:12b
+```
+
+LUCID를 다시 시작한 뒤 브라우저 확장의 **화면 또는 창 공유**를 누르고,
+운영체제 선택창에서 공유할 화면 또는 창을 직접 선택합니다. 캡처는 사용자가
+누른 한 번의 공유만 전달되며, 계속 녹화하거나 자동으로 감시하지 않습니다.
+
+```text
+/screen                              공유된 화면 상태 보기
+/screen 화면에 무슨 오류가 보여?      화면에 관해 질문하기
+/screen-think                        화면을 본 LUCID의 짧은 혼잣말 듣기
+```
+
+비전 모델은 기본으로 `gemma3:12b`를 사용합니다. 다른 Ollama 서버나 모델을
+사용하려면 실행 전에 아래 환경 변수를 설정할 수 있습니다.
+
+```powershell
+$env:LUCID_VISION_URL="https://your-ollama-server.example"
+$env:LUCID_VISION_MODEL="gemma3:12b"
+```

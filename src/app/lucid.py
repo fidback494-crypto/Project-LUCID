@@ -16,6 +16,7 @@ from src.emotion.emotion_engine import EmotionEngine
 from src.autonomy.autonomous_engine import AutonomousEngine
 from src.cognitive.cognitive_engine import CognitiveEngine
 from src.browser import BrowserBridge, PageContextStore
+from src.vision import VisionEngine
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -115,6 +116,7 @@ class LucidEngine:
         self.cognitive = CognitiveEngine()
         self.browser_context = PageContextStore()
         self.browser_bridge = BrowserBridge(self.browser_context)
+        self.vision = VisionEngine()
         self.autonomy = AutonomousEngine(
             self.self_model,
             self.long_memory,
@@ -335,6 +337,7 @@ class LucidEngine:
                         print("Title :", page.title or "(제목 없음)")
                         print("URL   :", page.url)
                         print("Selected text :", page.selection or "(없음)")
+                        print("Screen image :", "있음" if page.has_image else "없음")
 
                     continue
 
@@ -365,6 +368,68 @@ class LucidEngine:
                         "사용자가 공유한 현재 웹페이지를 보고, 사실을 꾸며내지 말고 "
                         "LUCID로서 짧은 혼잣말을 해 줘."
                     )
+
+                if user == "/screen":
+
+                    page = self.browser_context.latest()
+
+                    if page is None or not page.has_image:
+                        print(
+                            "\n아직 공유된 화면 이미지가 없어. 브라우저 확장의 "
+                            "‘화면 또는 창 공유’ 버튼을 눌러 줘."
+                        )
+
+                    else:
+                        print("\n========== Shared Screen ==========")
+                        print("Source :", page.title or "공유된 화면")
+                        print("Captured at :", page.received_at.strftime("%H:%M:%S"))
+
+                    continue
+
+                if user.startswith("/screen ") or user == "/screen-think":
+
+                    page = self.browser_context.latest()
+
+                    if page is None or not page.has_image:
+                        print(
+                            "\n먼저 브라우저 확장에서 ‘화면 또는 창 공유’를 눌러 줘."
+                        )
+                        continue
+
+                    is_think = user == "/screen-think"
+                    question = (
+                        "이 화면에서 실제로 보이는 내용과 분위기를 관찰해 줘."
+                        if is_think
+                        else user.removeprefix("/screen ").strip()
+                    )
+
+                    if not question:
+                        print("\n예: /screen 화면에 무슨 오류가 보여?")
+                        continue
+
+                    observation = self.vision.observe(page, question)
+
+                    if not observation:
+                        print(
+                            "\n화면을 분석하지 못했어. `gemma3:12b`가 Ollama에 "
+                            "설치되어 있고 실행 중인지 확인해 줘."
+                        )
+                        continue
+
+                    user = (
+                        "공유한 화면을 보고 얻은 관찰을 바탕으로, "
+                        "사실을 꾸며내지 말고 응답해 줘."
+                        if is_think
+                        else question
+                    )
+
+                    reply = self.life.process(
+                        user,
+                        visual_observation=observation,
+                    )
+                    print(f"\nLUCID > {reply}")
+                    self.autonomy.note_interaction()
+                    continue
 
                 reply = self.life.process(user)
 

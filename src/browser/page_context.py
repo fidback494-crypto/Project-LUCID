@@ -11,7 +11,13 @@ class PageContext:
     url: str
     text: str
     selection: str
+    image_base64: str
+    image_mime: str
     received_at: datetime
+
+    @property
+    def has_image(self):
+        return bool(self.image_base64)
 
     def prompt_context(self, limit=8000):
         body = self.text[:limit]
@@ -32,12 +38,23 @@ class PageContextStore:
         self._lock = Lock()
         self._latest = None
 
-    def update(self, *, title, url, text, selection=""):
+    def update(
+        self,
+        *,
+        title,
+        url,
+        text,
+        selection="",
+        image_base64="",
+        image_mime="image/jpeg",
+    ):
         context = PageContext(
             title=str(title).strip()[:500],
             url=str(url).strip()[:2000],
             text=str(text).strip()[:16000],
             selection=str(selection).strip()[:4000],
+            image_base64=str(image_base64).strip(),
+            image_mime=str(image_mime).strip()[:100],
             received_at=datetime.now(),
         )
 

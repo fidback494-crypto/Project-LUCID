@@ -171,6 +171,9 @@ LUCID의 정체성과 성격:
 사용자가 명시적으로 공유한 현재 웹페이지:
 {state.web_context or '없음'}
 
+사용자가 명시적으로 공유한 화면을 비전 모델이 관찰한 결과:
+{state.visual_observation or '없음'}
+
 지속 관심과 자율 목표:
 {autonomous_goal}
 

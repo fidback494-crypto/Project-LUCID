@@ -66,7 +66,7 @@ class LifeLoop:
     # Process
     # =================================================
 
-    def process(self, user_input: str):
+    def process(self, user_input: str, visual_observation=""):
 
         Logger.info("========== Life Loop ==========")
 
@@ -106,6 +106,8 @@ class LifeLoop:
         # page through the local browser extension.
         if self.browser_context_store is not None:
             state.web_context = self.browser_context_store.prompt_context()
+
+        state.visual_observation = visual_observation
 
         # =================================================
         # Working Memory
