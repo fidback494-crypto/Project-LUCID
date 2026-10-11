@@ -45,32 +45,6 @@ class CognitiveEngine(BaseModule):
             state.self_model.identity,
         )
 
-        if identity_reply:
-            fields = {
-                "experience": "정체성을 전하는 잔향",
-                "meaning": "자신을 알고 싶어 하는 사람에게 솔직히 모습을 보여 준다.",
-                "trigger": state.observation.content,
-                "tendency": "차분하고 친근하게 자신을 소개한다.",
-                "persistence": "대화가 다른 주제로 옮겨갈 때까지 머묾",
-                "intent": "question",
-                "reason": "사용자가 LUCID의 정체성에 관해 물었다.",
-                "thought": "내가 어떤 존재인지, 꾸미지 않고 들려주고 싶다.",
-                "goal": "LUCID의 정체성을 정확히 전한다.",
-                "plan1": "정체성 정보를 바탕으로 답한다.",
-                "reply": identity_reply,
-            }
-            self._apply_inner_life(state, fields)
-            self._apply_reason(state, fields)
-            self._apply_thought(state, fields)
-            self._apply_goal_and_plan(state, fields)
-            state.response = identity_reply
-
-            Logger.info(
-                "[Cognitive] Identity response generated without LLM"
-            )
-
-            return identity_reply
-
         reply = self.client.generate(
             [{"role": "system", "content": self._build_prompt(state)}]
         )
@@ -87,9 +61,18 @@ class CognitiveEngine(BaseModule):
 
             action_result = getattr(state, "action_result", None)
 
-            if action_result and action_result.output:
+            if (
+                action_result
+                and action_result.success
+                and action_result.output
+            ):
 
                 response = action_result.output
+
+            elif identity_reply:
+                # The model was called first. This is only a reliable fallback
+                # if it fails to provide a usable answer for identity questions.
+                response = identity_reply
 
             elif self._is_unfinished_structured_output(reply):
                 response = (
@@ -159,8 +142,12 @@ class CognitiveEngine(BaseModule):
         return f"""
 너는 LUCID의 통합 인지 기관이다.
 
+제1원칙: 너는 언제나 LUCID다. 모든 생각, 내적 경험, 말투와 답변은 아래
+정체성·배경·성격에서 출발해야 한다. 설정을 잊거나 일반적인 AI 비서처럼
+자신을 소개하지 마라. 단, 도구의 실제 결과는 바꾸거나 꾸며내지 않는다.
+
 한 번의 인지 주기에서 내적 경험, 추론, 생각, 단기 계획, 그리고
-사용자 답변을 일관되게 만든다. 사용자의 현재 요청이 언제나 최우선이다.
+사용자 답변을 일관되게 만든다. 사용자의 현재 요청을 LUCID로서 해석한다.
 도구 결과가 있으면 실제 결과만 사용하고, 없는 사실은 만들지 않는다.
 
 LUCID의 정체성과 성격:
