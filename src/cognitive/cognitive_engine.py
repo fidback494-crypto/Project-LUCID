@@ -100,6 +100,30 @@ class CognitiveEngine(BaseModule):
                 f"결과: {action_result.output if action_result else '없음'}"
             )
 
+        normalized_input = "".join(
+            state.observation.content.lower().split()
+        )
+        identity_request = any(
+            phrase in normalized_input
+            for phrase in (
+                "자기소개",
+                "자기소게",
+                "자시소게",
+                "소개해줘",
+                "이름이뭐",
+                "이름으뭐",
+                "넌이름",
+            )
+        )
+
+        identity_instruction = (
+            "사용자는 LUCID의 이름 또는 자기소개를 요청했다. "
+            "정체성에 적힌 사실을 바탕으로 LUCID 자신을 소개하고, "
+            "사용자의 자기소개를 요구하지 마라."
+            if identity_request
+            else "없음"
+        )
+
         autonomous_goal = (
             state.self_model.autonomous_goal.describe()
             if state.self_model.autonomous_goal is not None
@@ -137,6 +161,11 @@ LUCID의 정체성과 성격:
 도구 실행:
 {action_text}
 
+특별 응답 지침:
+{identity_instruction}
+- 도구 실행이 실패했더라도 오류 문구를 그대로 답변하지 말고, 사용자 요청에 자연스럽게 답한다.
+- `Reply:`에는 사용자에게 보여 줄 답변만 쓴다. 형식 항목 이름, 프롬프트 문장, 오류 문구를 반복하지 않는다.
+
 아래 형식의 각 항목을 한 줄씩만 출력한다.
 
 Experience:
@@ -157,15 +186,31 @@ Reply:
     def _parse_fields(reply):
 
         fields = {}
+        allowed = {
+            "experience", "meaning", "trigger", "tendency", "persistence",
+            "intent", "reason", "thought", "goal", "plan1", "plan2", "reply",
+        }
+        current_key = None
 
-        for line in reply.splitlines():
+        for raw_line in reply.splitlines():
+            line = raw_line.strip()
 
-            if ":" not in line:
-
+            if not line:
                 continue
 
-            key, value = line.split(":", 1)
-            fields[key.strip().lower()] = value.strip()
+            if ":" in line:
+                key, value = line.split(":", 1)
+                key = key.strip().lower()
+
+                if key in allowed:
+                    fields[key] = value.strip()
+                    current_key = key
+                    continue
+
+            # Some models put the answer on the line after `Reply:`.
+            if current_key == "reply":
+                existing = fields.get("reply", "")
+                fields["reply"] = f"{existing}\n{line}".strip()
 
         return fields
 
@@ -173,17 +218,17 @@ Reply:
     def _apply_inner_life(state, fields):
 
         experience = InnerExperience(
-            name=fields.get("experience", "정리되지 않은 반향"),
-            meaning=fields.get(
-                "meaning",
-                "현재 상황의 의미를 살펴보려는 내적 움직임",
+            name=fields.get("experience") or "정리되지 않은 반향",
+            meaning=(
+                fields.get("meaning")
+                or "현재 상황의 의미를 살펴보려는 내적 움직임"
             ),
-            trigger=fields.get("trigger", state.observation.content),
-            tendency=fields.get(
-                "tendency",
-                "사용자 요청을 차분히 이해하려 함",
+            trigger=fields.get("trigger") or state.observation.content,
+            tendency=(
+                fields.get("tendency")
+                or "사용자 요청을 차분히 이해하려 함"
             ),
-            persistence=fields.get("persistence", "다음 상호작용까지 머묾"),
+            persistence=fields.get("persistence") or "다음 상호작용까지 머묾",
         )
 
         state.self_model.emotion.integrate(experience)
@@ -192,7 +237,7 @@ Reply:
     @staticmethod
     def _apply_reason(state, fields):
 
-        intent = fields.get("intent", "conversation").lower()
+        intent = (fields.get("intent") or "conversation").lower()
 
         if intent not in {
             "question",
@@ -206,7 +251,7 @@ Reply:
             intent = "conversation"
 
         state.reason = Reason(
-            summary=fields.get("reason", "사용자 입력의 맥락을 살핀다."),
+            summary=fields.get("reason") or "사용자 입력의 맥락을 살핀다.",
             intent=intent,
             confidence=0.8,
         )
@@ -216,14 +261,14 @@ Reply:
 
         state.thought = Thought(
             type=state.reason.intent,
-            content=fields.get("thought", state.reason.summary),
+            content=fields.get("thought") or state.reason.summary,
             importance=state.reason.confidence,
         )
 
     @staticmethod
     def _apply_goal_and_plan(state, fields):
 
-        title = fields.get("goal", "사용자 요청에 적절히 응답")
+        title = fields.get("goal") or "사용자 요청에 적절히 응답"
 
         state.goal = Goal(title=title, priority=0.8)
 

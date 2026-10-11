@@ -8,6 +8,8 @@ Module : Decision Engine
 Creator : 시드
 """
 
+import re
+
 from src.kernel.base_module import BaseModule
 from src.utils import Logger
 
@@ -75,13 +77,7 @@ class DecisionEngine(BaseModule):
         # Calculator
         # -----------------------------------------
 
-        elif (
-            "계산" in text
-            or "+" in text
-            or "-" in text
-            or "*" in text
-            or "/" in text
-        ):
+        elif self._is_calculation_request(text):
 
             action.need_action = True
             action.tool = "calculator"
@@ -161,3 +157,18 @@ class DecisionEngine(BaseModule):
             )
 
         return decision
+
+    @staticmethod
+    def _is_calculation_request(text):
+        """Only send actual numeric expressions to the calculator.
+
+        Punctuation such as a trailing slash in an ordinary sentence must
+        remain ordinary conversation.
+        """
+
+        expression = re.fullmatch(
+            r"\s*[0-9.]+(?:\s*[+\-*/]\s*[0-9.]+)+\s*",
+            text,
+        )
+
+        return expression is not None

@@ -96,13 +96,6 @@ class LucidEngine:
         self.memory = WorkingMemory()
         self.long_memory = LongTermMemory()
         self.action.register(
-        "calculator",
-        CalculatorTool(),
-       )
-
-
-        
-        self.action.register(
         "memory",
          MemoryTool(self.long_memory),
         )

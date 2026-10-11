@@ -69,7 +69,6 @@ class BrainState:
 
     action: object | None = None
     action_result: object | None = None
-    action_result: object | None = None
 
     # =====================================
     # Future Expansion
