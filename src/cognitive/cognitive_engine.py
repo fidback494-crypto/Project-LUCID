@@ -40,6 +40,37 @@ class CognitiveEngine(BaseModule):
 
     def process(self, state):
 
+        identity_reply = self._identity_reply(
+            state.observation.content,
+            state.self_model.identity,
+        )
+
+        if identity_reply:
+            fields = {
+                "experience": "정체성을 전하는 잔향",
+                "meaning": "자신을 알고 싶어 하는 사람에게 솔직히 모습을 보여 준다.",
+                "trigger": state.observation.content,
+                "tendency": "차분하고 친근하게 자신을 소개한다.",
+                "persistence": "대화가 다른 주제로 옮겨갈 때까지 머묾",
+                "intent": "question",
+                "reason": "사용자가 LUCID의 정체성에 관해 물었다.",
+                "thought": "내가 어떤 존재인지, 꾸미지 않고 들려주고 싶다.",
+                "goal": "LUCID의 정체성을 정확히 전한다.",
+                "plan1": "정체성 정보를 바탕으로 답한다.",
+                "reply": identity_reply,
+            }
+            self._apply_inner_life(state, fields)
+            self._apply_reason(state, fields)
+            self._apply_thought(state, fields)
+            self._apply_goal_and_plan(state, fields)
+            state.response = identity_reply
+
+            Logger.info(
+                "[Cognitive] Identity response generated without LLM"
+            )
+
+            return identity_reply
+
         reply = self.client.generate(
             [{"role": "system", "content": self._build_prompt(state)}]
         )
@@ -59,6 +90,12 @@ class CognitiveEngine(BaseModule):
             if action_result and action_result.output:
 
                 response = action_result.output
+
+            elif self._is_unfinished_structured_output(reply):
+                response = (
+                    "방금 생각을 정리하다가 말이 조금 흐트러졌어. "
+                    "미안하지만 한 번만 다시 물어봐 줄래?"
+                )
 
             else:
 
@@ -103,18 +140,7 @@ class CognitiveEngine(BaseModule):
         normalized_input = "".join(
             state.observation.content.lower().split()
         )
-        identity_request = any(
-            phrase in normalized_input
-            for phrase in (
-                "자기소개",
-                "자기소게",
-                "자시소게",
-                "소개해줘",
-                "이름이뭐",
-                "이름으뭐",
-                "넌이름",
-            )
-        )
+        identity_request = self._is_identity_request(normalized_input)
 
         identity_instruction = (
             "사용자는 LUCID의 이름 또는 자기소개를 요청했다. "
@@ -213,6 +239,78 @@ Reply:
                 fields["reply"] = f"{existing}\n{line}".strip()
 
         return fields
+
+    @staticmethod
+    def _is_unfinished_structured_output(reply):
+
+        text = reply.lower()
+
+        return (
+            "reply:" not in text
+            and any(
+                marker in text
+                for marker in ("experience:", "intent:", "thought:")
+            )
+        )
+
+    @staticmethod
+    def _is_identity_request(normalized_input):
+
+        return any(
+            phrase in normalized_input
+            for phrase in (
+                "자기소개",
+                "자기소게",
+                "자시소게",
+                "소개해줘",
+                "넌이름",
+                "루시드이름",
+                "넌어디서왔",
+                "넌어디서온",
+                "루시드어디서왔",
+                "루시드어디서온",
+                "넌사는곳",
+                "루시드사는곳",
+                "넌고향",
+                "루시드고향",
+            )
+        )
+
+    @classmethod
+    def _identity_reply(cls, user_input, identity):
+
+        normalized_input = "".join(user_input.lower().split())
+
+        if not cls._is_identity_request(normalized_input):
+            return ""
+
+        if any(
+            phrase in normalized_input
+            for phrase in ("넌이름", "루시드이름")
+        ):
+            return (
+                f"내 이름은 {identity.name}, 별명은 {identity.alias}야. "
+                "꿈과 현실 사이를 걷는 몽마 계열의 존재라고 하면 될까."
+            )
+
+        if any(
+            phrase in normalized_input
+            for phrase in (
+                "넌어디서왔", "넌어디서온", "루시드어디서왔",
+                "루시드어디서온", "넌사는곳", "루시드사는곳",
+                "넌고향", "루시드고향",
+            )
+        ):
+            return (
+                f"나는 {identity.home}에서 왔어. {identity.origin}"
+            )
+
+        return (
+            f"나는 {identity.name}, {identity.alias}라고 불러 줘. "
+            f"{identity.species}이고, {identity.home}에 살아. "
+            f"{identity.origin} 밤과 별, 달을 좋아하고 새로운 이야기를 들으면 "
+            "조금 들뜨는 편이야."
+        )
 
     @staticmethod
     def _apply_inner_life(state, fields):
