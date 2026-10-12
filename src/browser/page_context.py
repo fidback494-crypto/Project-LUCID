@@ -13,6 +13,8 @@ class PageContext:
     selection: str
     image_base64: str
     image_mime: str
+    continuous: bool
+    version: int
     received_at: datetime
 
     @property
@@ -37,6 +39,7 @@ class PageContextStore:
     def __init__(self):
         self._lock = Lock()
         self._latest = None
+        self._version = 0
 
     def update(
         self,
@@ -47,18 +50,21 @@ class PageContextStore:
         selection="",
         image_base64="",
         image_mime="image/jpeg",
+        continuous=False,
     ):
-        context = PageContext(
-            title=str(title).strip()[:500],
-            url=str(url).strip()[:2000],
-            text=str(text).strip()[:16000],
-            selection=str(selection).strip()[:4000],
-            image_base64=str(image_base64).strip(),
-            image_mime=str(image_mime).strip()[:100],
-            received_at=datetime.now(),
-        )
-
         with self._lock:
+            self._version += 1
+            context = PageContext(
+                title=str(title).strip()[:500],
+                url=str(url).strip()[:2000],
+                text=str(text).strip()[:16000],
+                selection=str(selection).strip()[:4000],
+                image_base64=str(image_base64).strip(),
+                image_mime=str(image_mime).strip()[:100],
+                continuous=bool(continuous),
+                version=self._version,
+                received_at=datetime.now(),
+            )
             self._latest = context
 
         return context

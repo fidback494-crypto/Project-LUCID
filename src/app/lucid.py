@@ -17,6 +17,7 @@ from src.autonomy.autonomous_engine import AutonomousEngine
 from src.cognitive.cognitive_engine import CognitiveEngine
 from src.browser import BrowserBridge, PageContextStore
 from src.vision import VisionEngine
+from src.vision import VisualPresence
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -54,6 +55,7 @@ from src.self import SelfModel
 from src.self.experience_engine import ExperienceEngine
 
 from src.utils import Logger
+from threading import RLock
 
 
 class LucidEngine:
@@ -117,6 +119,12 @@ class LucidEngine:
         self.browser_context = PageContextStore()
         self.browser_bridge = BrowserBridge(self.browser_context)
         self.vision = VisionEngine()
+        self._life_lock = RLock()
+        self.visual_presence = VisualPresence(
+            self.browser_context,
+            self.vision,
+            self._on_visual_observation,
+        )
         self.autonomy = AutonomousEngine(
             self.self_model,
             self.long_memory,
@@ -227,6 +235,7 @@ class LucidEngine:
 
         self.kernel.start()
         self.browser_bridge.start()
+        self.visual_presence.start()
 
         self.running = True
 
@@ -423,15 +432,17 @@ class LucidEngine:
                         else question
                     )
 
-                    reply = self.life.process(
-                        user,
-                        visual_observation=observation,
-                    )
+                    with self._life_lock:
+                        reply = self.life.process(
+                            user,
+                            visual_observation=observation,
+                        )
                     print(f"\nLUCID > {reply}")
                     self.autonomy.note_interaction()
                     continue
 
-                reply = self.life.process(user)
+                with self._life_lock:
+                    reply = self.life.process(user)
 
                 print(f"\nLUCID > {reply}")
 
@@ -450,7 +461,27 @@ class LucidEngine:
 
         Logger.info("Shutting Down...")
 
+        self.running = False
         self.kernel.stop()
+        self.visual_presence.stop()
         self.browser_bridge.stop()
 
-        self.running = False
+    def _on_visual_observation(self, observation):
+        """Let LUCID react to a meaningful, user-shared screen change."""
+
+        if not self.running:
+            return
+
+        try:
+            with self._life_lock:
+                reply = self.life.process(
+                    "시야에 변화가 있었어. 방금 본 장면을 바탕으로 LUCID답게 "
+                    "한두 문장의 짧은 혼잣말을 해 줘. 사용자의 행동이나 의도를 "
+                    "단정하지 말고, 보이는 사실만 말해.",
+                    visual_observation=observation,
+                )
+
+            print(f"\nLUCID [곁에서] > {reply}")
+
+        except Exception as error:
+            Logger.error(f"[Vision Presence] {error}")

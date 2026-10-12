@@ -45,28 +45,31 @@ async function imageFromDesktopStream(stream) {
     const video = document.createElement("video");
     video.srcObject = stream;
     await video.play();
-
     const scale = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
     canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
     canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-
     return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
   } finally {
     stream.getTracks().forEach((track) => track.stop());
   }
 }
 
-async function captureDesktop(tab) {
+async function chooseDesktop() {
   const streamId = await new Promise((resolve) => {
-    chrome.desktopCapture.chooseDesktopMedia(["screen", "window"], tab, resolve);
+    chrome.desktopCapture.chooseDesktopMedia(["screen", "window"], resolve);
   });
 
   if (!streamId) {
     throw new Error("화면 또는 창 선택이 취소됐어.");
   }
 
+  return streamId;
+}
+
+async function captureDesktopOnce() {
+  const streamId = await chooseDesktop();
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
     video: {
@@ -80,6 +83,24 @@ async function captureDesktop(tab) {
   });
 
   return imageFromDesktopStream(stream);
+}
+
+async function ensureOffscreenDocument() {
+  const offscreenUrl = chrome.runtime.getURL("offscreen.html");
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+    documentUrls: [offscreenUrl]
+  });
+
+  if (contexts.length > 0) {
+    return;
+  }
+
+  await chrome.offscreen.createDocument({
+    url: "offscreen.html",
+    reasons: ["DISPLAY_MEDIA"],
+    justification: "사용자가 선택한 화면 또는 창을 LUCID에 이어서 관찰하게 합니다."
+  });
 }
 
 document.getElementById("share").addEventListener("click", async () => {
@@ -102,17 +123,54 @@ document.getElementById("share-screen").addEventListener("click", async () => {
     const token = getToken();
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     status.textContent = "공유할 화면 또는 창을 선택해 줘.";
-    const imageBase64 = await captureDesktop(tab);
+    const imageBase64 = await captureDesktopOnce();
     await sendToLucid(token, {
       title: "사용자가 공유한 화면 또는 창",
       url: tab.url || "",
       selection: "",
       text: "",
       image_base64: imageBase64,
-      image_mime: "image/jpeg"
+      image_mime: "image/jpeg",
+      continuous: false
     });
     status.textContent = "화면 이미지를 LUCID에 전달했어.";
   } catch (error) {
     status.textContent = `전송하지 못했어: ${error.message}`;
+  }
+});
+
+document.getElementById("start-observing").addEventListener("click", async () => {
+  try {
+    const token = getToken();
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await ensureOffscreenDocument();
+    status.textContent = "관찰할 화면 또는 창을 선택해 줘.";
+    const streamId = await chooseDesktop();
+    const response = await chrome.runtime.sendMessage({
+      type: "lucid-start-observing",
+      target: "offscreen",
+      options: { streamId, token, url: tab.url || "" }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "관찰을 시작하지 못했어.");
+    }
+
+    await chrome.storage.local.set({ lucidToken: token });
+    status.textContent = "루시드가 화면 변화를 곁에서 관찰 중이야.";
+  } catch (error) {
+    status.textContent = `관찰을 시작하지 못했어: ${error.message}`;
+  }
+});
+
+document.getElementById("stop-observing").addEventListener("click", async () => {
+  try {
+    await chrome.runtime.sendMessage({
+      type: "lucid-stop-observing",
+      target: "offscreen"
+    });
+    status.textContent = "이어지는 화면 관찰을 멈췄어.";
+  } catch (error) {
+    status.textContent = `관찰을 중지하지 못했어: ${error.message}`;
   }
 });

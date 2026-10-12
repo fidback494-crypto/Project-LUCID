@@ -92,10 +92,12 @@ class BrowserBridge:
                         selection=payload.get("selection", ""),
                         image_base64=image_base64,
                         image_mime=payload.get("image_mime", "image/jpeg"),
+                        continuous=payload.get("continuous", False),
                     )
-                    Logger.info(
-                        f"[Browser] Page shared: {context.title or context.url}"
-                    )
+                    if not context.continuous:
+                        Logger.info(
+                            f"[Browser] Page shared: {context.title or context.url}"
+                        )
                     self._headers()
                     self.wfile.write(b'{"ok":true}')
 
