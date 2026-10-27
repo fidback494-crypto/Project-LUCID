@@ -131,10 +131,10 @@ class LifeLoop:
 
         if record:
 
-            self.long_memory.store(record)
+            store_result = self.long_memory.store(record)
 
             Logger.info(
-                f"[LongMemory] Stored : {record.content}"
+                f"[LongMemory] {store_result} : {record.content}"
             )
 
         # =================================================

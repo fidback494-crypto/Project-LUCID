@@ -260,8 +260,65 @@ class LucidEngine:
 
                     print("\n========== Long Memory ==========")
 
-                    for memory in self.long_memory.all():
-                        print(memory)
+                    memories = self.long_memory.all()
+
+                    if not memories:
+                        print("저장된 장기 기억이 없어.")
+
+                    for memory in memories:
+                        print(
+                            f"#{memory['id']} [{memory['predicate']}] "
+                            f"{memory['content']} "
+                            f"(신뢰도 {memory['confidence']:.2f})"
+                        )
+
+                    continue
+
+                if user.startswith("/memory "):
+
+                    command = user.removeprefix("/memory ").strip()
+                    action, _, argument = command.partition(" ")
+
+                    if action == "search" and argument.strip():
+                        results = self.search.search(argument.strip())
+                        print("\n========== Memory Search ==========")
+
+                        if not results:
+                            print("관련 기억을 찾지 못했어.")
+
+                        for result in results:
+                            print("-", result)
+
+                    elif action == "history":
+                        print("\n========== Memory History ==========")
+                        memories = self.long_memory.all(include_history=True)
+
+                        if not memories:
+                            print("기억 이력이 없어.")
+
+                        for memory in memories:
+                            print(
+                                f"#{memory['id']} [{memory['status']}] "
+                                f"{memory['content']}"
+                            )
+
+                    elif action == "delete":
+                        try:
+                            memory_id = int(argument.strip())
+                        except ValueError:
+                            print("\n사용법: /memory delete <기억 번호>")
+                            continue
+
+                        if self.long_memory.delete(memory_id):
+                            print(f"\n기억 #{memory_id}을 목록에서 삭제했어.")
+                        else:
+                            print("\n해당 번호의 활성 기억을 찾지 못했어.")
+
+                    else:
+                        print(
+                            "\n기억 명령: /memory, /memory search <질문>, "
+                            "/memory history, /memory delete <번호>"
+                        )
 
                     continue
 

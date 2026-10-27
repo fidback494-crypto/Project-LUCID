@@ -41,8 +41,11 @@ class MemoryTool(BaseTool):
             result = []
 
             for memory in memories:
-
-                result.append(str(memory))
+                result.append(
+                    f"#{memory['id']} [{memory['predicate']}] "
+                    f"{memory['content']} "
+                    f"(신뢰도 {memory['confidence']:.2f})"
+                )
 
             return ActionResult(
                 success=True,
