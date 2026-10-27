@@ -9,13 +9,14 @@ class VisionEngine:
     def __init__(self):
         self.client = VisionClient()
 
-    def observe(self, page_context, question):
+    def observe(self, page_context, question, previous_observation=""):
         if page_context is None or not page_context.has_image:
             return ""
 
         observation = self.client.observe(
             page_context.image_base64,
             question,
+            previous_observation=previous_observation,
         )
 
         if observation:

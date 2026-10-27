@@ -235,9 +235,8 @@ class LucidEngine:
 
         self.kernel.start()
         self.browser_bridge.start()
-        self.visual_presence.start()
-
         self.running = True
+        self.visual_presence.start()
 
         Logger.info("LUCID is Alive.")
 
@@ -347,6 +346,11 @@ class LucidEngine:
                         print("URL   :", page.url)
                         print("Selected text :", page.selection or "(없음)")
                         print("Screen image :", "있음" if page.has_image else "없음")
+                        if page.has_image:
+                            print(
+                                "Continuous view :",
+                                "켜짐" if page.continuous else "꺼짐",
+                            )
 
                     continue
 
@@ -473,6 +477,8 @@ class LucidEngine:
             return
 
         try:
+            self.autonomy.note_interaction()
+
             with self._life_lock:
                 reply = self.life.process(
                     "시야에 변화가 있었어. 방금 본 장면을 바탕으로 LUCID답게 "

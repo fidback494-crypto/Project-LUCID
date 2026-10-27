@@ -1,6 +1,6 @@
 """The most recently user-shared browser page."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from threading import Lock
 
@@ -71,6 +71,20 @@ class PageContextStore:
 
     def latest(self):
         with self._lock:
+            return self._latest
+
+    def stop_continuous(self):
+        with self._lock:
+            if self._latest is None or not self._latest.continuous:
+                return self._latest
+
+            self._version += 1
+            self._latest = replace(
+                self._latest,
+                continuous=False,
+                version=self._version,
+                received_at=datetime.now(),
+            )
             return self._latest
 
     def prompt_context(self):

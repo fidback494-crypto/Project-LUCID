@@ -60,7 +60,7 @@ class BrowserBridge:
                 self._headers()
 
             def do_POST(self):
-                if self.path != "/context":
+                if self.path not in {"/context", "/stop"}:
                     self._headers(404)
                     self.wfile.write(b'{"error":"not found"}')
                     return
@@ -78,6 +78,12 @@ class BrowserBridge:
                     ):
                         self._headers(403)
                         self.wfile.write(b'{"error":"invalid token"}')
+                        return
+
+                    if self.path == "/stop":
+                        bridge.store.stop_continuous()
+                        self._headers()
+                        self.wfile.write(b'{"ok":true}')
                         return
 
                     image_base64 = str(payload.get("image_base64", ""))
