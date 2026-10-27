@@ -119,6 +119,14 @@ class CognitiveEngine(BaseModule):
             )
             for episode in state.related_conversation_episodes
         )
+        last_conversation = state.last_conversation_gap
+        last_conversation_context = (
+            f"기록 시각: {last_conversation.get('last_at', '기록 없음')}\n"
+            "시간대: 프로그램 실행 장치의 현지 시각\n"
+            f"경과: {last_conversation.get('elapsed_text', '확인된 이전 기록이 없음')}\n"
+            f"기록 출처: {last_conversation.get('source', 'none')}\n"
+            f"태도 지침: {last_conversation.get('reaction_guidance', '현재 대화에 집중한다.')}"
+        )
 
         action = getattr(state, "action", None)
         action_result = getattr(state, "action_result", None)
@@ -177,6 +185,11 @@ LUCID의 정체성과 성격:
 
 최근 대화:
 {conversation or '없음'}
+
+마지막 대화 시각과 공백:
+{last_conversation_context}
+이 시간 간격에 맞춰 반응의 연속성과 반가움 정도를 자연스럽게 조절한다. 매번
+시간을 답변에 언급할 필요는 없고, 정확하지 않은 추정 시각을 사실처럼 말하지 않는다.
 
 최근 5년 범위의 관련 대화 기억:
 {conversation_episodes or '없음'}

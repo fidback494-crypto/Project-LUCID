@@ -293,6 +293,14 @@ class LucidEngine:
                         print("\n========== LUCID Official Setting ==========")
                         print(self.self_model.identity.persona_prompt())
 
+                    elif action == "last":
+                        last = self.long_memory.last_conversation_gap()
+                        print("\n========== Last Conversation ==========")
+                        print(f"기록 시각: {last['last_at']}")
+                        print(f"경과: {last['elapsed_text']}")
+                        if last.get("is_approximate"):
+                            print("주의: 대화 로그가 아닌 내적 경험 시각으로 추정한 값이야.")
+
                     elif action == "history":
                         print("\n========== Memory History ==========")
                         memories = self.long_memory.all(include_history=True)
@@ -335,7 +343,7 @@ class LucidEngine:
 
                     else:
                         print(
-                            "\n기억 명령: /memory, /memory canon, "
+                            "\n기억 명령: /memory, /memory canon, /memory last, "
                             "/memory search <질문>, "
                             "/memory history, /memory episodes, "
                             "/memory delete <번호>"

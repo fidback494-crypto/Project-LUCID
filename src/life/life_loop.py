@@ -172,6 +172,14 @@ class LifeLoop:
             f"{len(state.related_conversation_episodes)} related episodes found"
         )
 
+        state.last_conversation_gap = self.long_memory.last_conversation_gap()
+
+        Logger.info(
+            "[Conversation Memory] Last recorded contact: "
+            f"{state.last_conversation_gap['elapsed_text']} "
+            f"(source={state.last_conversation_gap['source']})"
+        )
+
         # =================================================
         # Decision and Action
         #

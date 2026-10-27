@@ -768,6 +768,120 @@ class LongTermMemory:
             Logger.error(f"[Conversation Memory] Load Error : {error}")
             return []
 
+    @staticmethod
+    def _elapsed_text(seconds):
+        minutes = int(seconds // 60)
+        hours = int(seconds // 3600)
+        days = int(seconds // 86400)
+
+        if seconds < 120:
+            return "방금"
+        if minutes < 60:
+            return f"약 {minutes}분 전"
+        if hours < 24:
+            return f"약 {hours}시간 전"
+        if days < 2:
+            return "하루쯤 전"
+        if days < 7:
+            return f"약 {days}일 전"
+        if days < 60:
+            return f"약 {max(1, round(days / 7))}주 전"
+        if days < 365:
+            return f"약 {max(2, round(days / 30))}개월 전"
+
+        years = days // 365
+        months = round((days % 365) / 30)
+        if months >= 12:
+            years += 1
+            months = 0
+        if months:
+            return f"약 {years}년 {months}개월 전"
+        return f"약 {years}년 전"
+
+    def last_conversation_gap(self):
+        """Describe time since the latest saved exchange, with a safe fallback."""
+
+        try:
+            with self._lock:
+                self.cursor.execute(
+                    """
+                    SELECT created_at
+                    FROM conversation_episodes
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                )
+                row = self.cursor.fetchone()
+                source = "conversation"
+
+                if row is None:
+                    self.cursor.execute(
+                        """
+                        SELECT created_at
+                        FROM inner_experiences
+                        ORDER BY id DESC
+                        LIMIT 1
+                        """
+                    )
+                    row = self.cursor.fetchone()
+                    source = "inner_experience_estimate"
+
+            if row is None or not row[0]:
+                return {
+                    "last_at": "기록 없음",
+                    "elapsed_seconds": None,
+                    "elapsed_text": "확인된 이전 기록이 없음",
+                    "source": "none",
+                    "reaction_guidance": "처음 만난 것처럼 자연스럽게 인사한다.",
+                }
+
+            recorded_at = datetime.fromisoformat(str(row[0]))
+            now = datetime.now()
+            if recorded_at.tzinfo is not None and now.tzinfo is None:
+                recorded_at = recorded_at.astimezone().replace(tzinfo=None)
+            elif recorded_at.tzinfo is None and now.tzinfo is not None:
+                recorded_at = recorded_at.replace(tzinfo=now.tzinfo)
+
+            elapsed_seconds = max(0.0, (now - recorded_at).total_seconds())
+            if elapsed_seconds < 3600:
+                guidance = "바로 이어지는 대화처럼 맥락을 잇고, 오랜만이라고 하지 않는다."
+            elif elapsed_seconds < 86400:
+                guidance = "같은 날의 대화처럼 자연스럽게 이어가고, 긴 공백을 과장하지 않는다."
+            elif elapsed_seconds < 7 * 86400:
+                guidance = "며칠 만의 대화라면 반가움을 가볍게 드러낸다."
+            elif elapsed_seconds < 30 * 86400:
+                guidance = "몇 주 만의 대화라면 오랜만이라는 반가움을 자연스럽게 표현하되, 과장하지 않는다."
+            elif elapsed_seconds < 180 * 86400:
+                guidance = "한두 달의 공백 뒤라면 오랜만에 만난 듯 따뜻하게 맞이하고, 최근 이야기를 궁금해한다."
+            elif elapsed_seconds < 365 * 86400:
+                guidance = "몇 달의 공백 뒤라면 반가움을 조금 더 분명히 드러내되, 기억하지 못하는 일을 아는 척하지 않는다."
+            else:
+                guidance = "1년 이상 만의 재회라면 의미 있게 반가워하고 지금의 이야기를 궁금해하되, 기다렸다고 압박하거나 죄책감을 주지 않는다."
+
+            approximate = source != "conversation"
+            if approximate:
+                guidance += " 이 날짜는 대화 기록이 없어 내적 경험 시각으로 추정한 값이므로 정확한 마지막 대화일처럼 말하지 않는다."
+
+            return {
+                "last_at": recorded_at.isoformat(timespec="minutes"),
+                "elapsed_seconds": elapsed_seconds,
+                "elapsed_text": self._elapsed_text(elapsed_seconds),
+                "source": source,
+                "is_approximate": approximate,
+                "reaction_guidance": guidance,
+            }
+
+        except Exception as error:
+            Logger.error(f"[Conversation Memory] Last conversation lookup failed : {error}")
+            return {
+                "last_at": "확인할 수 없음",
+                "elapsed_seconds": None,
+                "elapsed_text": "기록 시각을 계산하지 못함",
+                "source": "unavailable",
+                "is_approximate": True,
+                "reaction_guidance": "시간 간격을 추측하지 말고 현재 대화에 집중한다.",
+            }
+
     def search_inner_experiences(self, query, limit=3):
         """Return recent, keyword-relevant experiences without an LLM call."""
         keywords = self._query_terms(query)
