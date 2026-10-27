@@ -9,6 +9,7 @@ Creator : 시드
 """
 
 import os
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -573,6 +574,88 @@ class LongTermMemory:
                 f"[Inner Life] Load Error : {e}"
             )
 
+            return []
+
+    def search_inner_experiences(self, query, limit=3):
+        """Return recent, keyword-relevant experiences without an LLM call."""
+
+        stopwords = {
+            "나는", "난", "나", "내", "제", "저는", "전", "너", "네",
+            "그", "저", "이", "뭐", "뭐야", "무엇", "어떻게", "어떤",
+            "좀", "지금", "정말", "말해", "들려줘", "해줘", "했어",
+            "있어", "없어", "인가", "그리고", "그런", "저런",
+        }
+        particles = (
+            "으로", "에서", "에게", "한테", "까지", "부터", "처럼",
+            "보다", "은", "는", "이", "가", "을", "를", "의", "에",
+            "와", "과", "도", "만", "야", "요", "죠", "까",
+        )
+        tokens = re.findall(r"[0-9a-z가-힣]+", str(query).casefold())
+        keywords = []
+
+        for token in tokens:
+            keyword = token
+
+            for particle in particles:
+                if len(keyword) > len(particle) + 1 and keyword.endswith(particle):
+                    keyword = keyword[:-len(particle)]
+                    break
+
+            if len(keyword) > 1 and keyword not in stopwords:
+                keywords.append(keyword)
+
+        keywords = list(dict.fromkeys(keywords))
+
+        if not keywords:
+            return []
+
+        searchable_text = "lower(COALESCE(name, '') || ' ' || " \
+            "COALESCE(meaning, '') || ' ' || COALESCE(trigger_text, '') || ' ' || " \
+            "COALESCE(tendency, '') || ' ' || COALESCE(persistence, ''))"
+        score = " + ".join(
+            f"CASE WHEN {searchable_text} LIKE ? THEN 1 ELSE 0 END"
+            for _ in keywords
+        )
+        conditions = " OR ".join(
+            f"{searchable_text} LIKE ?"
+            for _ in keywords
+        )
+        parameters = [f"%{keyword}%" for keyword in keywords]
+
+        try:
+            with self._lock:
+                self.cursor.execute(
+                    f"""
+                    SELECT id, name, meaning, trigger_text, tendency,
+                           persistence, created_at, ({score}) AS relevance
+                    FROM inner_experiences
+                    WHERE {conditions}
+                    ORDER BY relevance DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (*parameters, *parameters, max(1, min(int(limit), 8))),
+                )
+                rows = self.cursor.fetchall()
+
+            return [
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "meaning": row[2],
+                    "trigger": row[3],
+                    "tendency": row[4],
+                    "persistence": row[5],
+                    "created_at": row[6],
+                    "relevance": row[7],
+                }
+                for row in rows
+            ]
+
+        except (TypeError, ValueError):
+            Logger.error("[Inner Life] Invalid experience search limit")
+            return []
+        except Exception as error:
+            Logger.error(f"[Inner Life] Search Error : {error}")
             return []
 
     # ==========================================

@@ -147,6 +147,18 @@ class LifeLoop:
 
         workspace.long_memory = state.long_memory
 
+        state.related_inner_experiences = (
+            self.long_memory.search_inner_experiences(
+                state.observation.content,
+                limit=3,
+            )
+        )
+
+        Logger.info(
+            "[Inner Life Memory] "
+            f"{len(state.related_inner_experiences)} related experiences found"
+        )
+
         # =================================================
         # Decision and Action
         #

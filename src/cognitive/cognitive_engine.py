@@ -106,6 +106,11 @@ class CognitiveEngine(BaseModule):
             else str(message)
             for message in state.conversation[-6:]
         )
+        related_experiences = "\n".join(
+            "- {name}: {meaning} (계기: {trigger}, 반응 경향: {tendency}, "
+            "지속: {persistence})".format(**experience)
+            for experience in state.related_inner_experiences
+        )
 
         action = getattr(state, "action", None)
         action_result = getattr(state, "action_result", None)
@@ -164,6 +169,11 @@ LUCID의 정체성과 성격:
 
 최근 대화:
 {conversation or '없음'}
+
+현재 상황과 관련된 과거 내적 경험:
+{related_experiences or '없음'}
+과거 경험은 참고 자료일 뿐 현재 감정을 결정하지 않는다. 현재 상황과 다르면
+과거 반응을 반복하지 말고, 이번 상황에서 새로 생긴 내적 경험을 만든다.
 
 현재 내적 경험:
 {state.self_model.emotion.summary()}
