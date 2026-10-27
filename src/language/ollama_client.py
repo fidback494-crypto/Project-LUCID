@@ -160,6 +160,7 @@ class OllamaClient:
     def generate(
         self,
         messages,
+        options=None,
     ):
 
         # -----------------------------------------
@@ -201,6 +202,8 @@ class OllamaClient:
             "prompt": prompt,
             "stream": False,
         }
+        if options:
+            payload["options"] = options
 
         try:
 

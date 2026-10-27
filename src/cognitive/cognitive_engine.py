@@ -15,6 +15,8 @@ from src.language.ollama_client import OllamaClient
 from src.mind.plan import Plan
 from src.mind.reason import Reason
 from src.mind.thought import Thought
+from time import monotonic
+
 from src.utils import Logger
 
 
@@ -45,9 +47,14 @@ class CognitiveEngine(BaseModule):
             state.self_model.identity,
         )
 
+        Logger.info("[Cognitive] Generating response from Ollama")
+        started_at = monotonic()
         reply = self.client.generate(
-            [{"role": "system", "content": self._build_prompt(state)}]
+            [{"role": "system", "content": self._build_prompt(state)}],
+            options={"num_predict": 512},
         )
+        elapsed = monotonic() - started_at
+        Logger.info(f"[Cognitive] Ollama response received in {elapsed:.1f}s")
 
         fields = self._parse_fields(reply)
         self._apply_inner_life(state, fields)
