@@ -289,6 +289,10 @@ class LucidEngine:
                         for result in results:
                             print("-", result)
 
+                    elif action == "canon":
+                        print("\n========== LUCID Official Setting ==========")
+                        print(self.self_model.identity.persona_prompt())
+
                     elif action == "history":
                         print("\n========== Memory History ==========")
                         memories = self.long_memory.all(include_history=True)
@@ -331,7 +335,8 @@ class LucidEngine:
 
                     else:
                         print(
-                            "\n기억 명령: /memory, /memory search <질문>, "
+                            "\n기억 명령: /memory, /memory canon, "
+                            "/memory search <질문>, "
                             "/memory history, /memory episodes, "
                             "/memory delete <번호>"
                         )
