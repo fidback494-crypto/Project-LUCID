@@ -159,6 +159,19 @@ class LifeLoop:
             f"{len(state.related_inner_experiences)} related experiences found"
         )
 
+        state.related_conversation_episodes = (
+            self.long_memory.search_conversation_episodes(
+                state.observation.content,
+                limit=3,
+                years=self.long_memory.MIN_CONVERSATION_MEMORY_YEARS,
+            )
+        )
+
+        Logger.info(
+            "[Conversation Memory] "
+            f"{len(state.related_conversation_episodes)} related episodes found"
+        )
+
         # =================================================
         # Decision and Action
         #
@@ -229,6 +242,12 @@ class LifeLoop:
 
         self.conversation.add_assistant(
             state.response
+        )
+
+        self.long_memory.store_conversation_episode(
+            user_text=state.observation.content,
+            assistant_text=state.response,
+            intent=state.reason.intent,
         )
 
         # =================================================

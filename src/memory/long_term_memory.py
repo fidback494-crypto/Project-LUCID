@@ -26,6 +26,20 @@ from .memory_record import (
 
 class LongTermMemory:
 
+    MIN_CONVERSATION_MEMORY_YEARS = 5
+
+    _MEMORY_STOPWORDS = {
+        "나는", "난", "나", "내", "제", "저는", "전", "너", "네",
+        "그", "저", "이", "뭐", "뭐야", "무엇", "어떻게", "어떤",
+        "좀", "지금", "정말", "말해", "들려줘", "해줘", "했어",
+        "있어", "없어", "인가", "그리고", "그런", "저런",
+    }
+    _MEMORY_PARTICLES = (
+        "으로", "에서", "에게", "한테", "까지", "부터", "처럼",
+        "보다", "은", "는", "이", "가", "을", "를", "의", "에",
+        "와", "과", "도", "만", "야", "요", "죠", "까",
+    )
+
     def __init__(self):
 
         project_root = Path(__file__).resolve().parents[2]
@@ -103,6 +117,25 @@ class LongTermMemory:
                 active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL
             )
+            """
+        )
+
+        self.cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_episodes(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_text TEXT NOT NULL,
+                assistant_text TEXT NOT NULL,
+                intent TEXT NOT NULL DEFAULT 'conversation',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        self.cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_conversation_episodes_created_at
+            ON conversation_episodes(created_at)
             """
         )
 
@@ -576,35 +609,168 @@ class LongTermMemory:
 
             return []
 
-    def search_inner_experiences(self, query, limit=3):
-        """Return recent, keyword-relevant experiences without an LLM call."""
-
-        stopwords = {
-            "나는", "난", "나", "내", "제", "저는", "전", "너", "네",
-            "그", "저", "이", "뭐", "뭐야", "무엇", "어떻게", "어떤",
-            "좀", "지금", "정말", "말해", "들려줘", "해줘", "했어",
-            "있어", "없어", "인가", "그리고", "그런", "저런",
-        }
-        particles = (
-            "으로", "에서", "에게", "한테", "까지", "부터", "처럼",
-            "보다", "은", "는", "이", "가", "을", "를", "의", "에",
-            "와", "과", "도", "만", "야", "요", "죠", "까",
-        )
+    @classmethod
+    def _query_terms(cls, query):
         tokens = re.findall(r"[0-9a-z가-힣]+", str(query).casefold())
-        keywords = []
+        terms = []
 
         for token in tokens:
-            keyword = token
+            term = token
 
-            for particle in particles:
-                if len(keyword) > len(particle) + 1 and keyword.endswith(particle):
-                    keyword = keyword[:-len(particle)]
+            for particle in cls._MEMORY_PARTICLES:
+                if len(term) > len(particle) + 1 and term.endswith(particle):
+                    term = term[:-len(particle)]
                     break
 
-            if len(keyword) > 1 and keyword not in stopwords:
-                keywords.append(keyword)
+            if len(term) > 1 and term not in cls._MEMORY_STOPWORDS:
+                terms.append(term)
 
-        keywords = list(dict.fromkeys(keywords))
+        return list(dict.fromkeys(terms))[:20]
+
+    def store_conversation_episode(
+        self,
+        user_text,
+        assistant_text,
+        intent="conversation",
+        created_at=None,
+    ):
+        """Persist one exchange so LUCID can recall it in later sessions."""
+
+        timestamp = created_at or datetime.now().isoformat()
+
+        try:
+            with self._lock:
+                self.cursor.execute(
+                    """
+                    INSERT INTO conversation_episodes
+                    (user_text, assistant_text, intent, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        str(user_text),
+                        str(assistant_text),
+                        str(intent or "conversation"),
+                        timestamp,
+                    ),
+                )
+                episode_id = self.cursor.lastrowid
+                self.db.commit()
+
+            Logger.info(f"[Conversation Memory] Stored episode #{episode_id}")
+            return episode_id
+
+        except Exception as error:
+            with self._lock:
+                self.db.rollback()
+            Logger.error(f"[Conversation Memory] Store Error : {error}")
+            return None
+
+    def search_conversation_episodes(self, query, limit=3, years=5):
+        """Search a minimum five-year window without deleting older records."""
+
+        terms = self._query_terms(query)
+        if not terms:
+            return []
+
+        try:
+            years = max(
+                self.MIN_CONVERSATION_MEMORY_YEARS,
+                min(int(years), datetime.now().year - 1),
+            )
+            limit = max(1, min(int(limit), 8))
+        except (TypeError, ValueError):
+            Logger.error("[Conversation Memory] Invalid search window or limit")
+            return []
+
+        now = datetime.now()
+        cutoff_year = now.year - years
+        try:
+            cutoff = now.replace(year=cutoff_year).isoformat()
+        except ValueError:
+            # Preserve the same month/day when the target year is not a leap year.
+            cutoff = now.replace(year=cutoff_year, month=2, day=28).isoformat()
+        searchable_text = (
+            "lower(COALESCE(user_text, '') || ' ' || "
+            "COALESCE(assistant_text, '') || ' ' || COALESCE(intent, ''))"
+        )
+        score = " + ".join(
+            f"CASE WHEN {searchable_text} LIKE ? THEN 1 ELSE 0 END"
+            for _ in terms
+        )
+        conditions = " OR ".join(
+            f"{searchable_text} LIKE ?"
+            for _ in terms
+        )
+        patterns = [f"%{term}%" for term in terms]
+
+        try:
+            with self._lock:
+                self.cursor.execute(
+                    f"""
+                    SELECT id, user_text, assistant_text, intent, created_at,
+                           ({score}) AS relevance
+                    FROM conversation_episodes
+                    WHERE created_at >= ? AND ({conditions})
+                    ORDER BY relevance DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (*patterns, cutoff, *patterns, limit),
+                )
+                rows = self.cursor.fetchall()
+
+            return [
+                {
+                    "id": row[0],
+                    "user_text": row[1],
+                    "assistant_text": row[2],
+                    "intent": row[3],
+                    "created_at": row[4],
+                    "relevance": row[5],
+                }
+                for row in rows
+            ]
+
+        except Exception as error:
+            Logger.error(f"[Conversation Memory] Search Error : {error}")
+            return []
+
+    def recent_conversation_episodes(self, limit=10):
+        try:
+            limit = max(1, min(int(limit), 50))
+
+            with self._lock:
+                self.cursor.execute(
+                    """
+                    SELECT id, user_text, assistant_text, intent, created_at
+                    FROM conversation_episodes
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                )
+                rows = self.cursor.fetchall()
+
+            return [
+                {
+                    "id": row[0],
+                    "user_text": row[1],
+                    "assistant_text": row[2],
+                    "intent": row[3],
+                    "created_at": row[4],
+                }
+                for row in reversed(rows)
+            ]
+
+        except (TypeError, ValueError):
+            Logger.error("[Conversation Memory] Invalid recent episode limit")
+            return []
+        except Exception as error:
+            Logger.error(f"[Conversation Memory] Load Error : {error}")
+            return []
+
+    def search_inner_experiences(self, query, limit=3):
+        """Return recent, keyword-relevant experiences without an LLM call."""
+        keywords = self._query_terms(query)
 
         if not keywords:
             return []

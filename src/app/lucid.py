@@ -302,6 +302,21 @@ class LucidEngine:
                                 f"{memory['content']}"
                             )
 
+                    elif action == "episodes":
+                        print("\n========== Conversation Episodes ==========")
+                        episodes = self.long_memory.recent_conversation_episodes(10)
+
+                        if not episodes:
+                            print("저장된 대화 기억이 없어.")
+
+                        for episode in episodes:
+                            print(
+                                f"\n#{episode['id']} {episode['created_at']} "
+                                f"[{episode['intent']}]\n"
+                                f"시드: {episode['user_text'][:240]}\n"
+                                f"LUCID: {episode['assistant_text'][:240]}"
+                            )
+
                     elif action == "delete":
                         try:
                             memory_id = int(argument.strip())
@@ -317,7 +332,8 @@ class LucidEngine:
                     else:
                         print(
                             "\n기억 명령: /memory, /memory search <질문>, "
-                            "/memory history, /memory delete <번호>"
+                            "/memory history, /memory episodes, "
+                            "/memory delete <번호>"
                         )
 
                     continue
