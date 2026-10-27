@@ -410,6 +410,7 @@ class LongTermMemory:
             if str(keyword).strip()
         ))
 
+        keywords = keywords[:20]
         if not keywords:
             return []
 

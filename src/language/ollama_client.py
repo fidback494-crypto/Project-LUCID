@@ -49,6 +49,7 @@ class OllamaClient:
             "LUCID_OLLAMA_MODEL",
             "qwen2.5:3b",
         )
+        self.session = requests.Session()
 
     # =============================================
     # Connection Test
@@ -58,7 +59,7 @@ class OllamaClient:
 
         try:
 
-            response = requests.get(
+            response = self.session.get(
                 f"{self.base_url}/api/tags",
                 timeout=10,
             )
@@ -93,7 +94,7 @@ class OllamaClient:
 
         try:
 
-            response = requests.post(
+            response = self.session.post(
                 self.api_url,
                 json=payload,
                 timeout=self.timeout,
@@ -203,7 +204,7 @@ class OllamaClient:
 
         try:
 
-            response = requests.post(
+            response = self.session.post(
                 self.generate_url,
                 json=payload,
                 timeout=self.timeout,

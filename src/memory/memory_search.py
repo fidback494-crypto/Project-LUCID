@@ -55,4 +55,4 @@ class MemorySearch:
             elif normalized.startswith("이름"):
                 keywords.append("name")
 
-        return list(dict.fromkeys(keywords))
+        return list(dict.fromkeys(keywords))[:20]

@@ -17,6 +17,7 @@ class VisionClient:
         ).strip().rstrip("/")
         self.model = os.getenv("LUCID_VISION_MODEL", "gemma3:12b")
         self.timeout = int(os.getenv("LUCID_VISION_TIMEOUT", "300"))
+        self.session = requests.Session()
 
     def observe(self, image_base64, question, previous_observation=""):
         comparison = (
@@ -50,7 +51,7 @@ class VisionClient:
         }
 
         try:
-            response = requests.post(
+            response = self.session.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
                 timeout=self.timeout,
