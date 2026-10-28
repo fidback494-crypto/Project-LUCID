@@ -18,6 +18,7 @@ from src.cognitive.cognitive_engine import CognitiveEngine
 from src.browser import BrowserBridge, PageContextStore
 from src.vision import VisionEngine
 from src.vision import VisualPresence
+from src.voice import UtauTTSClient
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -119,6 +120,7 @@ class LucidEngine:
         self.browser_context = PageContextStore()
         self.browser_bridge = BrowserBridge(self.browser_context)
         self.vision = VisionEngine()
+        self.voice = UtauTTSClient()
         self._life_lock = RLock()
         self.visual_presence = VisualPresence(
             self.browser_context,
@@ -234,6 +236,7 @@ class LucidEngine:
         self.kernel.register(self.experience)
 
         self.kernel.start()
+        self.voice.start()
         self.browser_bridge.start()
         self.running = True
         self.visual_presence.start()
@@ -527,14 +530,14 @@ class LucidEngine:
                             user,
                             visual_observation=observation,
                         )
-                    print(f"\nLUCID > {reply}")
+                    self._present_reply(reply)
                     self.autonomy.note_interaction()
                     continue
 
                 with self._life_lock:
                     reply = self.life.process(user)
 
-                print(f"\nLUCID > {reply}")
+                self._present_reply(reply)
 
                 self.autonomy.note_interaction()
 
@@ -573,7 +576,11 @@ class LucidEngine:
                     visual_observation=observation,
                 )
 
-            print(f"\nLUCID [곁에서] > {reply}")
+            self._present_reply(reply, label="LUCID [beside you] >")
 
         except Exception as error:
             Logger.error(f"[Vision Presence] {error}")
+
+    def _present_reply(self, reply, label="LUCID >"):
+        print(f"\n{label} {reply}")
+        self.voice.speak(reply)

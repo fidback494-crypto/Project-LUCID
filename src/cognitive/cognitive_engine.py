@@ -8,6 +8,8 @@ Module : Unified Cognitive Engine
 Creator : 시드
 """
 
+from time import monotonic
+
 from src.emotion.inner_experience import InnerExperience
 from src.goal.goal import Goal
 from src.kernel.base_module import BaseModule
@@ -15,8 +17,6 @@ from src.language.ollama_client import OllamaClient
 from src.mind.plan import Plan
 from src.mind.reason import Reason
 from src.mind.thought import Thought
-from time import monotonic
-
 from src.utils import Logger
 
 
@@ -83,13 +83,16 @@ class CognitiveEngine(BaseModule):
 
             elif self._is_unfinished_structured_output(reply):
                 response = (
-                    "방금 생각을 정리하다가 말이 조금 흐트러졌어. "
-                    "미안하지만 한 번만 다시 물어봐 줄래?"
+                    "I lost my train of thought while putting that together. "
+                    "Could you ask me once more?"
                 )
 
             else:
-
-                response = reply.strip() or "지금은 응답을 정리하지 못했어."
+                raw_reply = reply.strip()
+                if raw_reply.startswith("미안해."):
+                    response = "Sorry, I couldn't generate a reply just now."
+                else:
+                    response = raw_reply or "I'm not sure how to answer just now."
 
         state.response = response
 
@@ -149,7 +152,9 @@ class CognitiveEngine(BaseModule):
             )
 
         normalized_input = "".join(
-            state.observation.content.lower().split()
+            character
+            for character in state.observation.content.lower()
+            if character.isalnum()
         )
         identity_request = self._is_identity_request(normalized_input)
 
@@ -180,6 +185,11 @@ class CognitiveEngine(BaseModule):
 
 LUCID의 정체성과 성격:
 {state.self_model.identity.persona_prompt()}
+
+영어 음성 프로토타입 언어 규칙:
+- 사용자가 어떤 언어로 말하더라도 `Reply`는 자연스러운 영어로만 작성한다.
+- 내부 항목은 한국어여도 되지만, `Reply`에는 한국어를 섞지 않는다.
+- 이 프로토타입의 영어 규칙은 정체성 문장에 포함된 다른 언어 지침보다 우선한다.
 
 사용자 입력:
 {state.observation.content}
@@ -314,24 +324,34 @@ Reply:
                 "루시드사는곳",
                 "넌고향",
                 "루시드고향",
+                "whatsyourname",
+                "whoareyou",
+                "wheredoyoulive",
+                "whereareyoufrom",
             )
         )
 
     @classmethod
     def _identity_reply(cls, user_input, identity):
 
-        normalized_input = "".join(user_input.lower().split())
+        normalized_input = "".join(
+            character
+            for character in user_input.lower()
+            if character.isalnum()
+        )
 
         if not cls._is_identity_request(normalized_input):
             return ""
 
         if any(
             phrase in normalized_input
-            for phrase in ("넌이름", "루시드이름")
+            for phrase in (
+                "넌이름", "루시드이름", "whatsyourname", "whoareyou",
+            )
         ):
             return (
-                f"내 이름은 {identity.name}, 별명은 {identity.alias}야. "
-                "꿈과 현실 사이를 걷는 몽마 계열의 존재라고 하면 될까."
+                f"I'm {identity.name}, though you can call me {identity.alias}. "
+                "I'm a dream demon who wanders between dreams and reality."
             )
 
         if any(
@@ -339,18 +359,15 @@ Reply:
             for phrase in (
                 "넌어디서왔", "넌어디서온", "루시드어디서왔",
                 "루시드어디서온", "넌사는곳", "루시드사는곳",
-                "넌고향", "루시드고향",
+                "넌고향", "루시드고향", "wheredoyoulive", "whereareyoufrom",
             )
         ):
-            return (
-                f"나는 {identity.home}에서 왔어. {identity.origin}"
-            )
+            return f"I come from {identity.home}. {identity.origin}"
 
         return (
-            f"나는 {identity.name}, {identity.alias}라고 불러 줘. "
-            f"{identity.species}이고, {identity.home}에 살아. "
-            f"{identity.origin} 밤과 별, 달을 좋아하고 새로운 이야기를 들으면 "
-            "조금 들뜨는 편이야."
+            f"I'm {identity.name}, also known as {identity.alias}. "
+            f"I'm {identity.species}, and I live in {identity.home}. "
+            f"{identity.origin} I like nights, stars, and the moon."
         )
 
     @staticmethod
