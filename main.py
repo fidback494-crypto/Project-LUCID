@@ -7,7 +7,7 @@ from src.app.lucid import LucidEngine
 def configure_ollama_address():
 
     print("Ollama 서버 주소 설정")
-    print("주소를 입력하면 이번 실행에 적용하고, Enter를 누르면 기존 설정을 사용해.")
+    print("주소를 입력하면 이번 실행에 적용해. Enter를 누르면 기존 설정 또는 기본 주소를 사용해.")
 
     while True:
         address = input("Ollama 주소: ").strip()

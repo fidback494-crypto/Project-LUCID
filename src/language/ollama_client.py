@@ -30,7 +30,7 @@ class OllamaClient:
             os.getenv(
                 "LUCID_OLLAMA_URL",
                 "http://127.0.0.1:11434",
-            ).rstrip("/")
+            ).strip().rstrip("/")
         )
 
         self.api_url = f"{self.base_url}/api/chat"

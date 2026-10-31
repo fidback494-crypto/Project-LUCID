@@ -56,6 +56,25 @@ class CognitiveEngine(BaseModule):
         elapsed = monotonic() - started_at
         Logger.info(f"[Cognitive] Ollama response received in {elapsed:.1f}s")
 
+        upstream_error = reply.strip()
+        if upstream_error == "미안해. 응답 시간이 너무 오래 걸렸어.":
+            response = (
+                "Ollama 응답이 시간 초과됐어. Colab 런타임과 Ollama가 켜져 있는지, "
+                "입력한 Ollama 주소가 현재 세션의 주소인지 확인해 줘."
+            )
+            state.response = response
+            Logger.error("[Cognitive] Ollama request timed out; skipped this cognitive update")
+            return response
+
+        if upstream_error == "미안해. 현재 AI 서버에 연결할 수 없어.":
+            response = (
+                "Ollama 서버에 연결되지 않았어. Colab에서 Ollama와 터널이 실행 중인지, "
+                "입력한 주소가 Ollama 터널 주소인지 확인해 줘."
+            )
+            state.response = response
+            Logger.error("[Cognitive] Ollama connection failed; skipped this cognitive update")
+            return response
+
         fields = self._parse_fields(reply)
         self._apply_inner_life(state, fields)
         self._apply_reason(state, fields)
@@ -89,10 +108,7 @@ class CognitiveEngine(BaseModule):
 
             else:
                 raw_reply = reply.strip()
-                if raw_reply.startswith("미안해."):
-                    response = "Sorry, I couldn't generate a reply just now."
-                else:
-                    response = raw_reply or "I'm not sure how to answer just now."
+                response = raw_reply or "I'm not sure how to answer just now."
 
         state.response = response
 
