@@ -1,4 +1,4 @@
-"""Optional English speech output through a local UtauTTS server."""
+"""Optional English speech output through the Kokoro-compatible voice API."""
 
 import os
 import re
@@ -10,7 +10,7 @@ from src.utils import Logger
 
 
 class UtauTTSClient:
-    """Render English replies as WAV and play them when UtauTTS is available."""
+    """Render English replies as WAV; retain the class name for existing imports."""
 
     def __init__(self):
         self.base_url = os.getenv(
@@ -19,10 +19,6 @@ class UtauTTSClient:
         ).strip().rstrip("/")
         self.voicebank_id = os.getenv("LUCID_UTAUTTS_VOICEBANK_ID", "").strip()
         self.timeout = int(os.getenv("LUCID_UTAUTTS_TIMEOUT", "120"))
-        self.intonation_strength = float(
-            os.getenv("LUCID_UTAUTTS_INTONATION_STRENGTH", "4.0")
-        )
-        self.tone = os.getenv("LUCID_UTAUTTS_TONE", "").strip()
         self.session = requests.Session()
         self.available = False
 
@@ -43,7 +39,7 @@ class UtauTTSClient:
             voicebanks = response.json().get("voicebanks") or []
         except requests.RequestException as error:
             Logger.info(
-                "[Voice] UtauTTS is unavailable; LUCID will use text only. "
+                "[Voice] Kokoro voice server is unavailable; LUCID will use text only. "
                 f"({type(error).__name__})"
             )
             return False
@@ -52,7 +48,7 @@ class UtauTTSClient:
             return False
 
         if not voicebanks:
-            Logger.warning("[Voice] UtauTTS has no voicebanks installed.")
+            Logger.warning("[Voice] Kokoro server has no available voices.")
             return False
 
         if self.voicebank_id:
@@ -66,7 +62,7 @@ class UtauTTSClient:
             if selected is None:
                 Logger.warning(
                     "[Voice] Configured voicebank ID was not found. "
-                    "Set LUCID_UTAUTTS_VOICEBANK_ID to an ID from /api/voicebanks."
+                    "Use an ID listed by the Kokoro server's /api/voicebanks endpoint."
                 )
                 return False
         else:
@@ -79,7 +75,7 @@ class UtauTTSClient:
 
         self.available = True
         Logger.info(
-            "[Voice] English UtauTTS ready: "
+            "[Voice] Kokoro English voice ready: "
             f"{selected.get('name') or self.voicebank_id}"
         )
         if len(voicebanks) > 1 and not os.getenv("LUCID_UTAUTTS_VOICEBANK_ID"):
@@ -106,18 +102,15 @@ class UtauTTSClient:
                     json={
                         "text": chunk,
                         "language": "en",
-                        "method": "reference-matching",
                         "voicebank_id": self.voicebank_id,
-                        "intonation_strength": self.intonation_strength,
-                        "apply_pitch": True,
-                        "tone": self.tone,
+                        "speed": float(os.getenv("LUCID_TTS_SPEED", "1.0")),
                     },
                     timeout=self.timeout,
                 )
                 response.raise_for_status()
 
                 if not response.headers.get("Content-Type", "").startswith("audio/wav"):
-                    Logger.warning("[Voice] UtauTTS returned a non-WAV response.")
+                    Logger.warning("[Voice] Kokoro returned a non-WAV response.")
                     return False
 
                 winsound.PlaySound(response.content, winsound.SND_MEMORY)
@@ -125,7 +118,7 @@ class UtauTTSClient:
             return True
         except requests.RequestException as error:
             Logger.warning(
-                f"[Voice] UtauTTS synthesis failed: {type(error).__name__}"
+                f"[Voice] Kokoro synthesis failed: {type(error).__name__}"
             )
         except Exception as error:
             Logger.warning(f"[Voice] Audio playback failed: {error}")
@@ -134,7 +127,7 @@ class UtauTTSClient:
 
     @staticmethod
     def _split_text(text, max_chars=450):
-        """Keep each synthesis request under UtauTTS's 500-character limit."""
+        """Keep each synthesis request under the voice server's 500-character limit."""
         chunks = []
         current = ""
 

@@ -1,60 +1,27 @@
-# English voice prototype
+# Kokoro English voice
 
-LUCID replies in English in this prototype. If a local UtauTTS server is running,
-LUCID also synthesizes each reply as a WAV and plays it on Windows. Without the
-server, text chat continues normally.
+LUCID can send its reply to the Kokoro voice server and play the returned WAV on
+Windows. Text chat continues if the voice server is unavailable.
 
-## Start UtauTTS
+## Start the voice server
 
-1. Download and extract the Windows x64 package from the
-   [UtauTTS releases](https://github.com/yh2237/UtauTTS/releases).
-2. Install an English-capable voicebank and check its own license and usage rules.
-3. From the extracted folder, start the local server:
+1. Open `project_lucid_kokoro.ipynb` in Google Colab and run its cells in order.
+2. Keep the runtime open. In the final cell, copy the current Kokoro tunnel URL
+   printed on the `LUCID_UTAUTTS_URL` line.
+3. In PowerShell, run `python main.py` from the Project-LUCID folder.
+4. Enter the Ollama server URL when prompted.
+5. At the Kokoro prompt, paste the current Kokoro tunnel URL. LUCID selects
+   `af_amber` automatically.
 
-   ```powershell
-   .\utautts-server.exe --voice-dir ".\voice" --port 8080
-   ```
+The notebook uses a Cloudflare Quick Tunnel, so its address can change whenever
+the Colab session restarts. Copy the newly printed address for each new session.
 
-4. In another PowerShell window, check the voicebank IDs:
+## Voice settings and limits
 
-   ```powershell
-   (Invoke-RestMethod http://127.0.0.1:8080/api/voicebanks).voicebanks |
-     Select-Object id, name
-   ```
-
-5. If the first listed voicebank is not the English voicebank you want, set its ID
-   before starting LUCID:
-
-   ```powershell
-   $env:LUCID_UTAUTTS_VOICEBANK_ID = "voicebank-id"
-   ```
-
-6. Run `python main.py`. The UtauTTS server must remain running in its own window.
-
-UtauTTS uses a local HTTP server on `127.0.0.1:8080`. LUCID sends the English
-reply to `/api/synthesize/audio` and plays the returned WAV. The synthesis API
-supports English and pitch-related settings; voicebank support and sound quality
-depend on the selected voicebank.
-
-## Pitch settings
-
-The default pitch follows the voicebank. Set a note such as `C4` or `D4` to choose
-the synthesis reference pitch for the next LUCID process:
-
-```powershell
-$env:LUCID_UTAUTTS_TONE = "D4"
-```
-
-The pitch reference must fit the voicebank's recorded range. The default
-intonation strength is `4.0`; change it with `LUCID_UTAUTTS_INTONATION_STRENGTH`
-to adjust how strongly pitch moves through a sentence.
-
-## Settings
-
-- `LUCID_UTAUTTS_URL`: server URL; default `http://127.0.0.1:8080`.
-- `LUCID_UTAUTTS_VOICEBANK_ID`: selected voicebank ID; if unset, LUCID selects the
-  first bank reported by the server.
-- `LUCID_UTAUTTS_TIMEOUT`: synthesis timeout in seconds; default `120`.
-- `LUCID_UTAUTTS_TONE`: optional base pitch such as `C4` or `D4`.
-- `LUCID_UTAUTTS_INTONATION_STRENGTH`: pitch contour strength from `0` to `8`;
-  default `4.0`.
+- Voice preset: `af_amber` (Kokoro English voice).
+- `LUCID_TTS_SPEED`: optional speed from `0.5` to `2.0`; default is `1.0`.
+- Kokoro's configured pipeline is English. LUCID's current replies are Korean,
+  so Korean text may be pronounced inaccurately by this English voice model.
+- Automatic WAV playback currently works on Windows.
+- The existing `UtauTTSClient` class name is retained so existing imports keep
+  working; it now calls the Kokoro-compatible API.
