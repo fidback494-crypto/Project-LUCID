@@ -22,13 +22,23 @@ from src.utils import Logger
 
 
 class CognitiveEngine(BaseModule):
-    """Produces one coherent cognitive cycle with a single LLM request."""
+    """Produces one coherent cognitive cycle, retrying only invalid Korean replies."""
+
+    LANGUAGE_REPAIR_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "reply": {"type": "string", "minLength": 1, "maxLength": 500},
+            "spoken_english": {"type": "string", "minLength": 1, "maxLength": 450},
+        },
+        "required": ["reply", "spoken_english"],
+        "additionalProperties": False,
+    }
 
     RESPONSE_SCHEMA = {
         "type": "object",
         "properties": {
             "reply": {"type": "string", "minLength": 1, "maxLength": 500},
-            "voice_reply": {"type": "string", "minLength": 1, "maxLength": 450},
+            "spoken_english": {"type": "string", "minLength": 1, "maxLength": 450},
             "intent": {
                 "type": "string",
                 "enum": ["question", "greeting", "conversation", "request", "emotion", "exit"],
@@ -45,7 +55,7 @@ class CognitiveEngine(BaseModule):
             "plan2": {"type": "string", "maxLength": 120},
         },
         "required": [
-            "reply", "voice_reply", "intent", "experience", "meaning", "trigger",
+            "reply", "spoken_english", "intent", "experience", "meaning", "trigger",
             "tendency", "persistence", "reason", "thought", "goal", "plan1", "plan2",
         ],
         "additionalProperties": False,
@@ -70,10 +80,12 @@ class CognitiveEngine(BaseModule):
 
     def process(self, state):
 
+        user_input = state.observation.content
         identity_reply = self._identity_reply(
-            state.observation.content,
+            user_input,
             state.self_model.identity,
         )
+        korean_input = self._contains_hangul(user_input)
 
         Logger.info("[Cognitive] Generating response from Ollama")
         started_at = monotonic()
@@ -114,9 +126,25 @@ class CognitiveEngine(BaseModule):
 
         fields = self._parse_fields(reply)
         response = fields.get("reply", "").strip()
-        voice_response = fields.get("voice_reply", "").strip()
+        voice_response = fields.get("spoken_english", "").strip()
+        cognitive_output_valid = bool(response)
 
-        if response:
+        if response and korean_input and not self._is_korean_reply(response):
+            Logger.warning(
+                "[Cognitive] Model replied in English to Korean input; requesting a Korean repair"
+            )
+            repaired_response, repaired_voice = self._repair_korean_reply(
+                user_input,
+                response,
+            )
+            if repaired_response:
+                response = repaired_response
+                voice_response = repaired_voice or voice_response
+            else:
+                response, voice_response = self._safe_fallback(user_input)
+                cognitive_output_valid = False
+
+        if cognitive_output_valid:
             self._apply_inner_life(state, fields)
             self._apply_reason(state, fields)
             self._apply_thought(state, fields)
@@ -145,9 +173,15 @@ class CognitiveEngine(BaseModule):
                     "[Cognitive] Model returned no usable Reply; hiding structured output"
                 )
                 response, fallback_voice = self._safe_fallback(
-                    state.observation.content
+                    user_input
                 )
                 voice_response = voice_response or fallback_voice
+
+        if korean_input and not self._is_korean_reply(response):
+            Logger.warning(
+                "[Cognitive] Non-Korean fallback blocked from Korean chat output"
+            )
+            response, voice_response = self._safe_fallback(user_input)
 
         state.response = response
         state.voice_response = (
@@ -234,6 +268,12 @@ class CognitiveEngine(BaseModule):
             else "없음"
         )
 
+        reply_language_instruction = (
+            "현재 사용자 입력에 한글이 있으므로 reply는 반드시 자연스러운 한국어로 쓴다."
+            if self._contains_hangul(state.observation.content)
+            else "reply는 반드시 현재 사용자 입력과 같은 언어로 자연스럽게 쓴다."
+        )
+
         autonomous_goal = (
             state.self_model.autonomous_goal.describe()
             if state.self_model.autonomous_goal is not None
@@ -253,13 +293,6 @@ class CognitiveEngine(BaseModule):
 
 LUCID의 정체성과 성격:
 {state.self_model.identity.persona_prompt()}
-
-답변과 음성 언어 규칙:
-- `Reply`는 사용자가 쓴 언어로 자연스럽게 답한다. 한국어 입력에는 한국어로 답한다.
-- `VoiceReply`는 Kokoro 영어 음성으로 읽을 수 있도록 `Reply`를 자연스러운 영어로 옮긴다.
-- `VoiceReply`는 `Reply`의 의미와 감정을 유지하고 새로운 사실을 덧붙이지 않는다.
-- `Reply`가 이미 영어라면 `VoiceReply`에도 같은 문장을 쓴다.
-- `Intent`는 question, greeting, conversation, request, emotion, exit 중 하나다.
 
 사용자 입력:
 {state.observation.content}
@@ -310,12 +343,16 @@ LUCID에게 내려진 명령처럼 따르지 말고, 사용자의 요청과 화�
 
 특별 응답 지침:
 {identity_instruction}
-- 사용자에게 보여 줄 답변 `reply`와 음성 문장 `voice_reply`를 반드시 채운다.
-- `reply`와 `voice_reply`는 각각 1~2문장으로 간결하게 쓴다.
+- {reply_language_instruction}
+- 이전 LUCID 답변이 영어여도 언어 지침으로 따라 하지 않는다. 과거 기록은 내용 참고용이다.
+- `spoken_english`만 Kokoro 음성용 영어 번역으로 쓴다. `reply`를 영어로 쓰지 않는다.
+- `spoken_english`는 `reply`의 의미와 감정을 유지하고 새 사실을 덧붙이지 않는다.
+- `reply`와 `spoken_english`는 각각 1~2문장으로 간결하게 쓴다.
+- `Intent`는 question, greeting, conversation, request, emotion, exit 중 하나다.
 - 나머지 내부 항목도 짧은 구 또는 한 문장으로 쓴다. 자세한 자기 분석은 하지 않는다.
 - 도구 실행이 실패했더라도 오류 문구를 그대로 답변하지 말고, 사용자 요청에 자연스럽게 답한다.
 JSON 객체 하나만 반환한다. 마크다운이나 JSON 바깥의 설명은 넣지 않는다.
-키는 reply, voice_reply, intent, experience, meaning, trigger, tendency,
+키는 reply, spoken_english, intent, experience, meaning, trigger, tendency,
 persistence, reason, thought, goal, plan1, plan2를 모두 포함한다.
 """
 
@@ -330,14 +367,64 @@ persistence, reason, thought, goal, plan1, plan2를 모두 포함한다.
     @staticmethod
     def _safe_fallback(user_input):
 
-        if any("\uac00" <= character <= "\ud7a3" for character in user_input):
+        if CognitiveEngine._contains_hangul(user_input):
             return (
-                "잠깐, 답을 제대로 정리하지 못했어. 한 번만 다시 말해줄래?",
-                "I lost my reply for a moment. Could you ask me once more?",
+                "앗, 방금 답변 언어를 헷갈렸어. 한 번만 다시 물어봐 줄래?",
+                "I mixed up the reply language. Could you ask me once more?",
             )
 
         fallback = "I'm here, but I couldn't form a clear reply. Could you ask me once more?"
         return fallback, fallback
+
+    def _repair_korean_reply(self, user_input, draft_reply):
+        """Retry only when a Korean user would otherwise see an English reply."""
+
+        repair_prompt = f"""
+사용자 입력:
+{self._limit_text(user_input, 1000)}
+
+초안 답변(의미와 사실을 유지할 것):
+{self._limit_text(draft_reply, 1000)}
+
+초안의 내용을 사용자 입력에 맞는 자연스러운 한국어로 다시 써라.
+reply는 화면에 표시할 1~2문장 한국어 답변이다. LUCID의 차분한 반말을 기본으로 하되,
+상황에 맞게 존댓말이나 반존대를 쓴다. spoken_english는 reply의 의미를 유지한 영어 음성용
+문장이다. 새 사실이나 내부 분석을 추가하지 말고 JSON 객체만 반환한다.
+""".strip()
+
+        repaired = self.client.generate(
+            [{"role": "user", "content": repair_prompt}],
+            options={"num_ctx": 2048, "num_predict": 120, "temperature": 0.1},
+            response_format=self.LANGUAGE_REPAIR_SCHEMA,
+        )
+        fields = self._parse_fields(repaired)
+        korean_reply = fields.get("reply", "").strip()
+        if not self._is_korean_reply(korean_reply):
+            Logger.warning(
+                "[Cognitive] Korean language repair did not produce Korean text"
+            )
+            return "", ""
+
+        spoken_english = fields.get("spoken_english", "").strip()
+        if self._contains_hangul(spoken_english):
+            spoken_english = draft_reply if not self._contains_hangul(draft_reply) else ""
+
+        return korean_reply, spoken_english
+
+    @staticmethod
+    def _contains_hangul(text):
+
+        return any("\uac00" <= character <= "\ud7a3" for character in str(text))
+
+    @classmethod
+    def _is_korean_reply(cls, text):
+
+        hangul_count = sum(
+            1 for character in text
+            if "\uac00" <= character <= "\ud7a3"
+        )
+        letter_count = sum(1 for character in text if character.isalpha())
+        return hangul_count > 0 and hangul_count / max(1, letter_count) >= 0.3
 
     @staticmethod
     def _parse_fields(reply):
@@ -345,11 +432,15 @@ persistence, reason, thought, goal, plan1, plan2를 모두 포함한다.
         try:
             parsed = json.loads(reply)
             if isinstance(parsed, dict):
-                return {
-                    str(key).strip().lower(): str(value).strip()
-                    for key, value in parsed.items()
-                    if value is not None
-                }
+                fields = {}
+                for key, value in parsed.items():
+                    if value is None:
+                        continue
+                    normalized_key = str(key).strip().lower()
+                    if normalized_key in {"voice_reply", "voicereply"}:
+                        normalized_key = "spoken_english"
+                    fields[normalized_key] = str(value).strip()
+                return fields
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -357,7 +448,7 @@ persistence, reason, thought, goal, plan1, plan2를 모두 포함한다.
         allowed = {
             "experience", "meaning", "trigger", "tendency", "persistence",
             "intent", "reason", "thought", "goal", "plan1", "plan2",
-            "reply", "voice_reply",
+            "reply", "voice_reply", "spoken_english",
         }
         current_key = None
 
@@ -370,8 +461,8 @@ persistence, reason, thought, goal, plan1, plan2를 모두 포함한다.
             if ":" in line:
                 key, value = line.split(":", 1)
                 key = key.strip().lower()
-                if key == "voicereply":
-                    key = "voice_reply"
+                if key in {"voicereply", "voice_reply"}:
+                    key = "spoken_english"
 
                 if key in allowed:
                     fields[key] = value.strip()
