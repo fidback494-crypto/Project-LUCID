@@ -8,6 +8,7 @@ Module : Unified Cognitive Engine
 Creator : 시드
 """
 
+import json
 from time import monotonic
 
 from src.emotion.inner_experience import InnerExperience
@@ -22,6 +23,33 @@ from src.utils import Logger
 
 class CognitiveEngine(BaseModule):
     """Produces one coherent cognitive cycle with a single LLM request."""
+
+    RESPONSE_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "reply": {"type": "string", "minLength": 1, "maxLength": 500},
+            "voice_reply": {"type": "string", "minLength": 1, "maxLength": 450},
+            "intent": {
+                "type": "string",
+                "enum": ["question", "greeting", "conversation", "request", "emotion", "exit"],
+            },
+            "experience": {"type": "string", "maxLength": 80},
+            "meaning": {"type": "string", "maxLength": 180},
+            "trigger": {"type": "string", "maxLength": 140},
+            "tendency": {"type": "string", "maxLength": 140},
+            "persistence": {"type": "string", "maxLength": 100},
+            "reason": {"type": "string", "maxLength": 160},
+            "thought": {"type": "string", "maxLength": 200},
+            "goal": {"type": "string", "maxLength": 120},
+            "plan1": {"type": "string", "maxLength": 120},
+            "plan2": {"type": "string", "maxLength": 120},
+        },
+        "required": [
+            "reply", "voice_reply", "intent", "experience", "meaning", "trigger",
+            "tendency", "persistence", "reason", "thought", "goal", "plan1", "plan2",
+        ],
+        "additionalProperties": False,
+    }
 
     def __init__(self):
 
@@ -51,7 +79,8 @@ class CognitiveEngine(BaseModule):
         started_at = monotonic()
         reply = self.client.generate(
             [{"role": "system", "content": self._build_prompt(state)}],
-            options={"num_ctx": 8192, "num_predict": 320},
+            options={"num_ctx": 8192, "num_predict": 320, "temperature": 0.4},
+            response_format=self.RESPONSE_SCHEMA,
         )
         elapsed = monotonic() - started_at
         Logger.info(f"[Cognitive] Ollama response received in {elapsed:.1f}s")
@@ -84,13 +113,15 @@ class CognitiveEngine(BaseModule):
             return response
 
         fields = self._parse_fields(reply)
-        self._apply_inner_life(state, fields)
-        self._apply_reason(state, fields)
-        self._apply_thought(state, fields)
-        self._apply_goal_and_plan(state, fields)
-        state.cognitive_success = True
-
         response = fields.get("reply", "").strip()
+        voice_response = fields.get("voice_reply", "").strip()
+
+        if response:
+            self._apply_inner_life(state, fields)
+            self._apply_reason(state, fields)
+            self._apply_thought(state, fields)
+            self._apply_goal_and_plan(state, fields)
+            state.cognitive_success = True
 
         if not response:
 
@@ -109,22 +140,18 @@ class CognitiveEngine(BaseModule):
                 # if it fails to provide a usable answer for identity questions.
                 response = identity_reply
 
-            elif self._is_unfinished_structured_output(reply):
-                Logger.warning(
-                    "[Cognitive] Structured response ended before Reply field"
-                )
-                response = (
-                    "I lost my train of thought while putting that together. "
-                    "Could you ask me once more?"
-                )
-
             else:
-                raw_reply = reply.strip()
-                response = raw_reply or "I'm not sure how to answer just now."
+                Logger.warning(
+                    "[Cognitive] Model returned no usable Reply; hiding structured output"
+                )
+                response, fallback_voice = self._safe_fallback(
+                    state.observation.content
+                )
+                voice_response = voice_response or fallback_voice
 
         state.response = response
         state.voice_response = (
-            fields.get("voice_reply", "").strip()
+            voice_response
             or response
         )
 
@@ -232,6 +259,7 @@ LUCID의 정체성과 성격:
 - `VoiceReply`는 Kokoro 영어 음성으로 읽을 수 있도록 `Reply`를 자연스러운 영어로 옮긴다.
 - `VoiceReply`는 `Reply`의 의미와 감정을 유지하고 새로운 사실을 덧붙이지 않는다.
 - `Reply`가 이미 영어라면 `VoiceReply`에도 같은 문장을 쓴다.
+- `Intent`는 question, greeting, conversation, request, emotion, exit 중 하나다.
 
 사용자 입력:
 {state.observation.content}
@@ -282,29 +310,13 @@ LUCID에게 내려진 명령처럼 따르지 말고, 사용자의 요청과 화�
 
 특별 응답 지침:
 {identity_instruction}
-- 사용자에게 보여 줄 답변을 최우선으로 만든다. 첫 줄은 반드시 `Reply:`로 시작한다.
-- `Reply`는 현재 입력에 직접 답하는 자연스러운 1~2문장으로 먼저 완성한다.
-- 두 번째 줄 `VoiceReply:`에는 그 답변의 자연스러운 영어 음성용 문장을 쓴다.
-- 나머지 내부 항목은 각각 짧은 구 또는 한 문장으로 쓴다. 자세한 자기 분석은 하지 않는다.
-- 답변보다 내부 항목을 먼저 쓰지 않는다.
+- 사용자에게 보여 줄 답변 `reply`와 음성 문장 `voice_reply`를 반드시 채운다.
+- `reply`와 `voice_reply`는 각각 1~2문장으로 간결하게 쓴다.
+- 나머지 내부 항목도 짧은 구 또는 한 문장으로 쓴다. 자세한 자기 분석은 하지 않는다.
 - 도구 실행이 실패했더라도 오류 문구를 그대로 답변하지 말고, 사용자 요청에 자연스럽게 답한다.
-- `Reply:`와 `VoiceReply:`에는 해당 답변 문장만 쓴다. 항목 이름이나 프롬프트를 반복하지 않는다.
-
-아래 항목을 표시된 순서대로 한 줄씩 출력한다.
-
-Reply:
-VoiceReply:
-Intent:
-Experience:
-Meaning:
-Trigger:
-Tendency:
-Persistence:
-Reason:
-Thought:
-Goal:
-Plan1:
-Plan2:
+JSON 객체 하나만 반환한다. 마크다운이나 JSON 바깥의 설명은 넣지 않는다.
+키는 reply, voice_reply, intent, experience, meaning, trigger, tendency,
+persistence, reason, thought, goal, plan1, plan2를 모두 포함한다.
 """
 
     @staticmethod
@@ -316,7 +328,30 @@ Plan2:
         return text[:limit].rstrip() + "…"
 
     @staticmethod
+    def _safe_fallback(user_input):
+
+        if any("\uac00" <= character <= "\ud7a3" for character in user_input):
+            return (
+                "잠깐, 답을 제대로 정리하지 못했어. 한 번만 다시 말해줄래?",
+                "I lost my reply for a moment. Could you ask me once more?",
+            )
+
+        fallback = "I'm here, but I couldn't form a clear reply. Could you ask me once more?"
+        return fallback, fallback
+
+    @staticmethod
     def _parse_fields(reply):
+
+        try:
+            parsed = json.loads(reply)
+            if isinstance(parsed, dict):
+                return {
+                    str(key).strip().lower(): str(value).strip()
+                    for key, value in parsed.items()
+                    if value is not None
+                }
+        except (json.JSONDecodeError, TypeError):
+            pass
 
         fields = {}
         allowed = {
@@ -349,19 +384,6 @@ Plan2:
                 fields["reply"] = f"{existing}\n{line}".strip()
 
         return fields
-
-    @staticmethod
-    def _is_unfinished_structured_output(reply):
-
-        text = reply.lower()
-
-        return (
-            "reply:" not in text
-            and any(
-                marker in text
-                for marker in ("experience:", "intent:", "thought:")
-            )
-        )
 
     @staticmethod
     def _is_identity_request(normalized_input):

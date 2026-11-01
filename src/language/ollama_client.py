@@ -161,6 +161,7 @@ class OllamaClient:
         self,
         messages,
         options=None,
+        response_format=None,
     ):
 
         # -----------------------------------------
@@ -204,6 +205,8 @@ class OllamaClient:
         }
         if options:
             payload["options"] = options
+        if response_format is not None:
+            payload["format"] = response_format
 
         try:
 
