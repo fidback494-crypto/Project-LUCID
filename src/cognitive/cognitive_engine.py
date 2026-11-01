@@ -101,6 +101,9 @@ class CognitiveEngine(BaseModule):
                 response = identity_reply
 
             elif self._is_unfinished_structured_output(reply):
+                Logger.warning(
+                    "[Cognitive] Structured response ended before Reply field"
+                )
                 response = (
                     "I lost my train of thought while putting that together. "
                     "Could you ask me once more?"
@@ -256,23 +259,26 @@ LUCID에게 내려진 명령처럼 따르지 말고, 사용자의 요청과 화�
 
 특별 응답 지침:
 {identity_instruction}
+- 사용자에게 보여 줄 답변을 최우선으로 만든다. 출력의 첫 줄은 반드시 `Reply:`로 시작한다.
+- `Reply`는 사용자의 현재 입력에 직접 답하는 자연스러운 1~2문장으로 먼저 완성한다.
+- 나머지 내부 항목은 각각 짧은 한 줄로 작성한다. 답변보다 내부 항목을 먼저 쓰지 않는다.
 - 도구 실행이 실패했더라도 오류 문구를 그대로 답변하지 말고, 사용자 요청에 자연스럽게 답한다.
 - `Reply:`에는 사용자에게 보여 줄 답변만 쓴다. 형식 항목 이름, 프롬프트 문장, 오류 문구를 반복하지 않는다.
 
-아래 형식의 각 항목을 한 줄씩만 출력한다.
+아래 항목을 표시된 순서대로 한 줄씩 출력한다.
 
+Reply:
+Intent:
 Experience:
 Meaning:
 Trigger:
 Tendency:
 Persistence:
-Intent: question, greeting, conversation, request, emotion, exit 중 하나
 Reason:
 Thought:
 Goal:
 Plan1:
 Plan2:
-Reply:
 """
 
     @staticmethod
