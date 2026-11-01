@@ -530,14 +530,16 @@ class LucidEngine:
                             user,
                             visual_observation=observation,
                         )
-                    self._present_reply(reply)
+                        voice_reply = self.workspace.current().voice_response
+                    self._present_reply(reply, voice_reply=voice_reply)
                     self.autonomy.note_interaction()
                     continue
 
                 with self._life_lock:
                     reply = self.life.process(user)
+                    voice_reply = self.workspace.current().voice_response
 
-                self._present_reply(reply)
+                self._present_reply(reply, voice_reply=voice_reply)
 
                 self.autonomy.note_interaction()
 
@@ -575,12 +577,17 @@ class LucidEngine:
                     "단정하지 말고, 보이는 사실만 말해.",
                     visual_observation=observation,
                 )
+                voice_reply = self.workspace.current().voice_response
 
-            self._present_reply(reply, label="LUCID [beside you] >")
+            self._present_reply(
+                reply,
+                label="LUCID [beside you] >",
+                voice_reply=voice_reply,
+            )
 
         except Exception as error:
             Logger.error(f"[Vision Presence] {error}")
 
-    def _present_reply(self, reply, label="LUCID >"):
+    def _present_reply(self, reply, label="LUCID >", voice_reply=None):
         print(f"\n{label} {reply}")
-        self.voice.speak(reply)
+        self.voice.speak(voice_reply or reply)

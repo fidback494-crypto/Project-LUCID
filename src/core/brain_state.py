@@ -29,6 +29,7 @@ class BrainState:
     plan: object | None = None
     decision: object | None = None
     response: str = ""
+    voice_response: str = ""
 
     # =====================================
     # Self

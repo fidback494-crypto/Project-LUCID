@@ -51,6 +51,7 @@ class Workspace:
 
         # 응답
         self.response = None
+        self.voice_response = None
 
         # 반성
         self.reflection = None
@@ -79,6 +80,7 @@ class Workspace:
         self.decision = None
 
         self.response = None
+        self.voice_response = None
         self.reflection = None
         self.experience = None
 

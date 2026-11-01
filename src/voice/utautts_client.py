@@ -89,6 +89,12 @@ class UtauTTSClient:
         if not self.available or not text or not text.strip():
             return False
 
+        if re.search(r"[\uac00-\ud7a3]", text):
+            Logger.warning(
+                "[Voice] Skipped Korean text because the configured Kokoro voice is English."
+            )
+            return False
+
         if sys.platform != "win32":
             Logger.warning("[Voice] Automatic WAV playback is currently Windows-only.")
             return False

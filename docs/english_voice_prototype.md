@@ -20,8 +20,11 @@ the Colab session restarts. Copy the newly printed address for each new session.
 
 - Voice preset: `af_amber` (Kokoro English voice).
 - `LUCID_TTS_SPEED`: optional speed from `0.5` to `2.0`; default is `1.0`.
-- Kokoro's configured pipeline is English. LUCID's current replies are Korean,
-  so Korean text may be pronounced inaccurately by this English voice model.
+- Kokoro's configured pipeline and voice are English. LUCID keeps the user's
+  language in the visible reply and creates a faithful English `VoiceReply` in
+  the same Ollama response for speech, without an extra model call.
+- If an English voice is accidentally given Korean text, playback is skipped
+  instead of sending Korean text to the English phonemizer.
 - Automatic WAV playback currently works on Windows.
 - The existing `UtauTTSClient` class name is retained so existing imports keep
   working; it now calls the Kokoro-compatible API.

@@ -229,6 +229,7 @@ class LifeLoop:
         state.response = self.cognitive.process(state)
 
         workspace.response = state.response
+        workspace.voice_response = state.voice_response
         workspace.emotion = state.emotion
         workspace.reason = state.reason
         workspace.thought = state.thought
