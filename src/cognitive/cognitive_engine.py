@@ -80,6 +80,7 @@ class CognitiveEngine(BaseModule):
         self._apply_reason(state, fields)
         self._apply_thought(state, fields)
         self._apply_goal_and_plan(state, fields)
+        state.cognitive_success = True
 
         response = fields.get("reply", "").strip()
 

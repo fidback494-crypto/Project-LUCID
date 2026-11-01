@@ -83,6 +83,7 @@ class LifeLoop:
         workspace.self_model = self.self_model
 
         state.self_model = self.self_model
+        state.emotion = self.self_model.emotion
 
         # =================================================
         # Observation
@@ -234,7 +235,7 @@ class LifeLoop:
         workspace.goal = state.goal
         workspace.plan = state.plan
 
-        if state.emotion.current is not None:
+        if state.cognitive_success and state.emotion.current is not None:
 
             self.long_memory.store_inner_experience(
                 state.emotion.current
@@ -255,7 +256,11 @@ class LifeLoop:
         self.long_memory.store_conversation_episode(
             user_text=state.observation.content,
             assistant_text=state.response,
-            intent=state.reason.intent,
+            intent=(
+                state.reason.intent
+                if state.reason is not None
+                else "conversation"
+            ),
         )
 
         # =================================================

@@ -67,6 +67,7 @@ class BrainState:
 
     emotion: object | None = None
     attention: object | None = None
+    cognitive_success: bool = False
 
     # =====================================
     # Action
