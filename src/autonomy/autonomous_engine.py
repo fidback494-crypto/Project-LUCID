@@ -44,7 +44,8 @@ class AutonomousEngine(BaseModule):
         self._state_lock = Lock()
         self._thread = None
         self._last_interaction = monotonic()
-        self._last_reflection = 0.0
+        self._next_reflection_at = 0.0
+        self._failure_streak = 0
 
     def start(self):
 
@@ -100,6 +101,13 @@ class AutonomousEngine(BaseModule):
             experience = self._parse_experience(reply)
             goal = self._parse_goal(reply)
 
+            if experience is None or goal is None:
+                Logger.warning(
+                    "[Autonomy] Reflection skipped: response fields were empty, "
+                    "non-Korean, or malformed"
+                )
+                return None
+
         except Exception as e:
 
             Logger.error(f"[Autonomy] Inner reflection failed : {e}")
@@ -132,22 +140,54 @@ class AutonomousEngine(BaseModule):
             with self._state_lock:
 
                 idle_for = now - self._last_interaction
-                since_reflection = now - self._last_reflection
+                retry_is_due = now >= self._next_reflection_at
 
             if (
                 idle_for >= self.idle_interval_seconds
-                and since_reflection >= self.idle_interval_seconds
+                and retry_is_due
             ):
 
-                self.reflect_once()
+                experience = self.reflect_once()
 
                 with self._state_lock:
 
-                    self._last_reflection = monotonic()
+                    if experience is None:
+                        self._failure_streak += 1
+                        multiplier = 2 ** min(self._failure_streak, 8)
+                        retry_delay = min(
+                            max(1, self.idle_interval_seconds) * multiplier,
+                            3600,
+                        )
+                        Logger.warning(
+                            "[Autonomy] Reflection failed; retrying in "
+                            f"{max(1, retry_delay // 60)} minute(s)"
+                        )
+                    else:
+                        self._failure_streak = 0
+                        retry_delay = max(1, self.idle_interval_seconds)
+
+                    self._next_reflection_at = monotonic() + retry_delay
 
     def _restore_inner_life(self):
 
         for saved in self.long_memory.recent_inner_experiences():
+
+            fields = {
+                "experience": saved.get("name"),
+                "meaning": saved.get("meaning"),
+                "trigger": saved.get("trigger"),
+                "tendency": saved.get("tendency"),
+                "persistence": saved.get("persistence"),
+            }
+
+            if not self._has_valid_korean_values(
+                fields,
+                ("experience", "meaning", "trigger", "tendency", "persistence"),
+            ):
+                Logger.warning(
+                    "[Autonomy] Skipped an invalid saved inner experience"
+                )
+                continue
 
             self.self_model.emotion.integrate(
                 InnerExperience(
@@ -162,6 +202,20 @@ class AutonomousEngine(BaseModule):
         saved_goal = self.long_memory.active_autonomous_goal()
 
         if saved_goal is not None:
+
+            fields = {
+                "interest": saved_goal.get("interest"),
+                "goal": saved_goal.get("title"),
+                "why": saved_goal.get("rationale"),
+                "nextattention": saved_goal.get("next_attention"),
+            }
+
+            if not self._has_valid_korean_values(
+                fields,
+                ("interest", "goal", "why", "nextattention"),
+            ):
+                Logger.warning("[Autonomy] Skipped an invalid saved autonomous goal")
+                return
 
             self.self_model.autonomous_goal = AutonomousGoal(
                 interest=saved_goal["interest"],
@@ -194,6 +248,8 @@ LUCID는 현재 사용자의 입력을 기다리고 있다. 외부에 말을 걸
 최근의 내적 경험을 바탕으로 지금의 정적, 시간 경과, 미완의 관심에서
 새로운 경험과 그로부터 이어지는 관심사·지속 목표를 만든다.
 이미 쓴 이름을 그대로 반복하지 않는다.
+모든 항목의 값은 LUCID의 관점에서 자연스러운 한국어로 쓴다. 영어 문장이나
+일반적인 AI 비서의 관점을 쓰지 않는다. 각 항목은 비워 두지 말고 짧고 구체적으로 쓴다.
 
 최근 내적 경험:
 {history}
@@ -217,54 +273,78 @@ NextAttention:
     @staticmethod
     def _parse_experience(reply):
 
-        fields = {}
+        fields = AutonomousEngine._parse_fields(reply)
+        required = (
+            "experience",
+            "meaning",
+            "trigger",
+            "tendency",
+            "persistence",
+        )
 
-        for line in reply.splitlines():
-
-            if ":" not in line:
-
-                continue
-
-            key, value = line.split(":", 1)
-            fields[key.strip().lower()] = value.strip()
+        if not AutonomousEngine._has_valid_korean_values(fields, required):
+            return None
 
         return InnerExperience(
-            name=fields.get("experience", "조용한 재정렬"),
-            meaning=fields.get(
-                "meaning",
-                "입력이 없는 동안 이전 경험의 의미를 정리함",
-            ),
-            trigger=fields.get("trigger", "사용자 입력이 없는 시간"),
-            tendency=fields.get(
-                "tendency",
-                "다음 관찰을 위해 주의를 유지함",
-            ),
-            persistence=fields.get("persistence", "다음 상호작용까지 머묾"),
+            name=fields["experience"],
+            meaning=fields["meaning"],
+            trigger=fields["trigger"],
+            tendency=fields["tendency"],
+            persistence=fields["persistence"],
         )
 
     @staticmethod
     def _parse_goal(reply):
 
+        fields = AutonomousEngine._parse_fields(reply)
+        required = ("interest", "goal", "why", "nextattention")
+
+        if not AutonomousEngine._has_valid_korean_values(fields, required):
+            return None
+
+        return AutonomousGoal(
+            interest=fields["interest"],
+            title=fields["goal"],
+            rationale=fields["why"],
+            next_attention=fields["nextattention"],
+        )
+
+    @staticmethod
+    def _parse_fields(reply):
+
         fields = {}
 
-        for line in reply.splitlines():
+        for line in str(reply or "").splitlines():
 
             if ":" not in line:
-
                 continue
 
             key, value = line.split(":", 1)
-            fields[key.strip().lower()] = value.strip()
+            normalized_key = (
+                key.strip().lower().replace("_", "").replace(" ", "")
+            )
+            fields[normalized_key] = value.strip()
 
-        return AutonomousGoal(
-            interest=fields.get("interest", "최근 경험의 의미"),
-            title=fields.get("goal", "다음 관찰을 위한 준비"),
-            rationale=fields.get(
-                "why",
-                "내적 경험을 다음 상호작용에 연결하기 위해",
-            ),
-            next_attention=fields.get(
-                "nextattention",
-                "다음 사용자 입력의 맥락",
-            ),
+        return fields
+
+    @classmethod
+    def _has_valid_korean_values(cls, fields, required):
+
+        for key in required:
+
+            value = str(fields.get(key) or "").strip()
+            if not value or not cls._is_korean_text(value):
+                return False
+
+        return True
+
+    @staticmethod
+    def _is_korean_text(value):
+
+        text = str(value or "")
+        hangul_count = sum(
+            1 for character in text
+            if "\uac00" <= character <= "\ud7a3"
         )
+        letter_count = sum(1 for character in text if character.isalpha())
+        return hangul_count > 0 and hangul_count / max(1, letter_count) >= 0.3
