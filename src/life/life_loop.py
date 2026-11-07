@@ -8,6 +8,9 @@ Module : Life Loop
 Creator : 시드
 """
 
+from collections import deque
+from time import monotonic
+
 from src.core.brain_state import BrainState
 from src.utils import Logger
 
@@ -61,6 +64,7 @@ class LifeLoop:
         self.action = action_engine
         self.cognitive = cognitive_engine
         self.browser_context_store = browser_context_store
+        self._recent_text_latencies = deque(maxlen=30)
 
     # =================================================
     # Process
@@ -68,6 +72,7 @@ class LifeLoop:
 
     def process(self, user_input: str, visual_observation=""):
 
+        turn_started_at = monotonic()
         Logger.info("========== Life Loop ==========")
 
         state = BrainState()
@@ -294,6 +299,29 @@ class LifeLoop:
 
         Logger.info(
             "========== End =========="
+        )
+
+        text_ready_seconds = monotonic() - turn_started_at
+        self._recent_text_latencies.append(text_ready_seconds)
+        average_seconds = sum(self._recent_text_latencies) / len(
+            self._recent_text_latencies
+        )
+        metrics = getattr(
+            getattr(self.cognitive, "client", None),
+            "last_metrics",
+            {},
+        )
+        if metrics.get("error"):
+            model_state = "unavailable"
+        elif metrics.get("load_seconds", 0) >= 0.5:
+            model_state = "cold"
+        else:
+            model_state = "warm"
+
+        Logger.info(
+            f"[Latency] text_ready={text_ready_seconds:.3f}s "
+            f"rolling_avg_{len(self._recent_text_latencies)}="
+            f"{average_seconds:.3f}s model={model_state}"
         )
 
         return state.response

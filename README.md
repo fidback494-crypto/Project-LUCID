@@ -39,8 +39,24 @@ python main.py
 LUCID_OLLAMA_URL       Ollama 서버 주소 (기본값: http://127.0.0.1:11434)
 LUCID_OLLAMA_MODEL     사용할 모델 (기본값: qwen2.5:3b)
 LUCID_OLLAMA_TIMEOUT   요청 제한 시간(초, 기본값: 300)
+LUCID_OLLAMA_KEEP_ALIVE 모델 메모리 유지 시간 (기본값: 10m)
 LUCID_DATA_DIR         로컬 기억 데이터 폴더 (기본값: 프로젝트/data)
 ```
+
+## 응답 속도
+
+텍스트 모델은 시작할 때 미리 불러오고 기본 10분 동안 메모리에 유지합니다. 유지 시간을
+바꾸려면 실행 전에 설정하세요.
+
+```powershell
+$env:LUCID_OLLAMA_KEEP_ALIVE="30m"
+```
+
+`[Ollama Timing]` 로그는 모델 로드, 프롬프트 처리, 생성 시간과 토큰 속도를 보여 줍니다.
+`[Latency] text_ready`는 한 입력의 처리 시작부터 텍스트 답변 준비까지의 시간이고,
+`rolling_avg`는 최근 최대 30회 평균입니다. 음성 생성과 재생 시간은 포함하지 않습니다.
+목표는 따뜻한 모델의 평균을 직접 연결에서 0.9초, 원격 터널에서 1.2초 이내로 맞추는
+것입니다. 실제 시간은 모델, 프롬프트 길이, 서버 부하와 네트워크에 따라 달라집니다.
 
 ## 데이터 이전
 

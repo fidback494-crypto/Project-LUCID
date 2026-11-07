@@ -9,6 +9,7 @@ Creator : 시드
 """
 
 import os
+from time import monotonic
 
 import requests
 
@@ -40,6 +41,10 @@ class OllamaClient:
         self.timeout = int(
             os.getenv("LUCID_OLLAMA_TIMEOUT", "300")
         )
+        self.keep_alive = os.getenv(
+            "LUCID_OLLAMA_KEEP_ALIVE",
+            "10m",
+        ).strip() or "10m"
 
         # =========================================
         # Model
@@ -50,6 +55,80 @@ class OllamaClient:
             "qwen2.5:3b",
         )
         self.session = requests.Session()
+        self.last_metrics = {}
+
+    def preload(self, timeout=15):
+        """Load the text model during startup so its first user turn is warm."""
+
+        started_at = monotonic()
+
+        try:
+            response = self.session.post(
+                self.generate_url,
+                json={
+                    "model": self.model,
+                    "prompt": "",
+                    "stream": False,
+                    "keep_alive": self.keep_alive,
+                },
+                timeout=(3, timeout),
+            )
+            response.raise_for_status()
+            data = response.json()
+            self._record_metrics(data, monotonic() - started_at, "warmup")
+            Logger.info(f"[Ollama] Model warmup completed: {self.model}")
+            return True
+
+        except requests.RequestException as error:
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
+            Logger.warning(
+                "[Ollama] Model warmup skipped; the first response may be slower. "
+                f"({type(error).__name__})"
+            )
+        except (ValueError, TypeError) as error:
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
+            Logger.warning(f"[Ollama] Invalid warmup response: {error}")
+
+        return False
+
+    def _record_metrics(self, data, request_wall_seconds, label="generate"):
+        """Retain Ollama's timing counters and log them beside HTTP wall time."""
+
+        def seconds(field):
+            try:
+                return float(data.get(field) or 0) / 1_000_000_000
+            except (TypeError, ValueError):
+                return 0.0
+
+        eval_count = int(data.get("eval_count") or 0)
+        eval_seconds = seconds("eval_duration")
+        self.last_metrics = {
+            "request_wall_seconds": request_wall_seconds,
+            "total_seconds": seconds("total_duration"),
+            "load_seconds": seconds("load_duration"),
+            "prompt_seconds": seconds("prompt_eval_duration"),
+            "generation_seconds": eval_seconds,
+            "prompt_tokens": int(data.get("prompt_eval_count") or 0),
+            "output_tokens": eval_count,
+            "tokens_per_second": (
+                eval_count / eval_seconds if eval_seconds > 0 else 0.0
+            ),
+        }
+        metrics = self.last_metrics
+        Logger.info(
+            f"[Ollama Timing] {label} wall={metrics['request_wall_seconds']:.3f}s "
+            f"load={metrics['load_seconds']:.3f}s "
+            f"prompt={metrics['prompt_seconds']:.3f}s "
+            f"generate={metrics['generation_seconds']:.3f}s "
+            f"tokens={metrics['prompt_tokens']}+{metrics['output_tokens']} "
+            f"speed={metrics['tokens_per_second']:.1f} tok/s"
+        )
 
     # =============================================
     # Connection Test
@@ -90,6 +169,7 @@ class OllamaClient:
             "model": self.model,
             "messages": messages,
             "stream": False,
+            "keep_alive": self.keep_alive,
         }
 
         try:
@@ -164,6 +244,8 @@ class OllamaClient:
         response_format=None,
     ):
 
+        self.last_metrics = {}
+
         # -----------------------------------------
         # messages가 문자열인 경우
         # -----------------------------------------
@@ -202,11 +284,14 @@ class OllamaClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": self.keep_alive,
         }
         if options:
             payload["options"] = options
         if response_format is not None:
             payload["format"] = response_format
+
+        started_at = monotonic()
 
         try:
 
@@ -219,6 +304,7 @@ class OllamaClient:
             response.raise_for_status()
 
             data = response.json()
+            self._record_metrics(data, monotonic() - started_at)
 
             result = data.get(
                 "response",
@@ -237,6 +323,11 @@ class OllamaClient:
 
         except requests.exceptions.Timeout:
 
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
+
             Logger.error(
                 "[Ollama] Generate Timeout"
             )
@@ -246,6 +337,11 @@ class OllamaClient:
             )
 
         except requests.exceptions.ConnectionError:
+
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
 
             Logger.error(
                 "[Ollama] Generate Connection Error"
@@ -257,6 +353,11 @@ class OllamaClient:
             )
 
         except Exception as e:
+
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
 
             Logger.error(
                 f"[Ollama] Generate Error : {e}"
