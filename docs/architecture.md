@@ -33,6 +33,7 @@
 - 매 턴 호출: `ObservationEngine`, `WorkingMemory`, `MemoryExtractor`, `MemorySearch`, `DecisionEngine`, `ActionEngine`, `CognitiveEngine`, `ReflectionEngine`, `ExperienceEngine`.
 - CognitiveEngine의 한 JSON 응답을 바탕으로 현재는 `InnerExperience`, `Reason`, `Thought`, `Goal`, `Plan` 객체를 만든다. 이 방식은 각 기관이 Ollama를 따로 부르지 않아 호출 횟수를 줄인다.
 - `CognitivePrompt`는 별도 Ollama 호출 없이 기억·화면·도구 결과를 한 번의 응답 요청에 조립한다. 도구 결과에는 성공 여부와 내용을 함께 넣는다.
+- Ollama가 일시적으로 연결되지 않아도 인사·안부·감사·간단한 공감은 `BasicConversationFallback`이 응답한다. 도구 결과가 이미 성공했다면 해당 결과를 바로 전달한다. 이 로컬 보완 경로는 자유 주제의 일반 답변을 대신하지 않으므로, 그때는 Ollama 연결이 필요하다.
 - `EmotionEngine`, `ReasoningEngine`, `ThoughtEngine`, `GoalEngine`, `PlanningEngine`, `LanguageEngine`은 Kernel에 등록되고 시작되지만, 일반 턴에서 각자의 `process()`는 호출되지 않는다. 이들의 역할 일부는 통합 CognitiveEngine 경로가 맡는다.
 - `Kernel.update()`는 사용자의 텍스트·화면 처리 전에 호출되어 등록된 기관의 업데이트 훅을 실행한다. Heartbeat와 Consciousness는 이 시점마다 이벤트 기반으로 갱신된다.
 - `AutonomousEngine`은 별도 백그라운드 스레드에서 상호작용 없이 기본 300초가 지난 뒤 내부 경험과 자율 목표를 만든다.
@@ -52,4 +53,4 @@
 
 ## 실패 처리
 
-Ollama 시간 초과 또는 연결 실패 때는 인지 상태 생성을 건너뛰고 안내 문구를 반환한다. 한국어 입력에 비한국어 답변이 오면 한국어 fallback을 쓴다. 도구 실행 실패는 `ActionResult`로 CognitiveEngine 문맥에 전달된다.
+Ollama 시간 초과 또는 연결 실패 때는 인지 상태 생성을 건너뛰고 기본 대화·성공한 도구 결과·연결 안내 중 적절한 응답을 반환한다. 한국어 입력에 비한국어 답변이 오면 한국어 fallback을 쓴다. 도구 실행 실패는 `ActionResult`로 CognitiveEngine 문맥에 전달된다.

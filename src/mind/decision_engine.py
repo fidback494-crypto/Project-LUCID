@@ -87,11 +87,7 @@ class DecisionEngine(BaseModule):
         # File
         # -----------------------------------------
 
-        elif (
-            "파일" in text
-            or "읽어" in text
-            or "열어" in text
-        ):
+        elif self._is_file_request(text):
 
             action.need_action = True
             action.tool = "file"
@@ -101,11 +97,7 @@ class DecisionEngine(BaseModule):
         # Web
         # -----------------------------------------
 
-        elif (
-            "검색" in text
-            or "찾아" in text
-            or "조사" in text
-        ):
+        elif self._is_web_request(text):
 
             action.need_action = True
             action.tool = "web"
@@ -128,11 +120,7 @@ class DecisionEngine(BaseModule):
         # Python
         # -----------------------------------------
 
-        elif (
-            "파이썬" in text
-            or "python" in text
-            or "코드 실행" in text
-        ):
+        elif self._is_python_request(text):
 
             action.need_action = True
             action.tool = "python"
@@ -167,8 +155,46 @@ class DecisionEngine(BaseModule):
         """
 
         expression = re.fullmatch(
-            r"\s*[0-9.]+(?:\s*[+\-*/]\s*[0-9.]+)+\s*",
+            r"\s*[0-9.]+(?:\s*[+\-*/]\s*[0-9.]+)+[?？]?\s*",
             text,
         )
 
         return expression is not None
+
+    @staticmethod
+    def _is_file_request(text):
+        has_file_action = any(
+            phrase in text
+            for phrase in ("파일 읽", "파일 열", "파일 보여", "파일 목록", "파일 확인")
+        )
+        has_project_path = bool(
+            re.search(
+                r"(?:src|docs|training|browser_extension)[/\\][\w./\\-]+\.[a-z0-9]{1,8}",
+                text,
+            )
+        )
+        has_read_verb = any(
+            phrase in text
+            for phrase in ("읽어", "열어", "보여", "목록", "read", "open", "list")
+        )
+        return has_file_action or (has_project_path and has_read_verb)
+
+    @staticmethod
+    def _is_web_request(text):
+        explicit_search = any(phrase in text for phrase in ("검색", "조사"))
+        explicit_lookup = (
+            any(phrase in text for phrase in ("인터넷에서", "웹에서", "온라인에서"))
+            and any(phrase in text for phrase in ("찾", "알아봐", "검색"))
+        )
+        english_search = bool(re.search(r"\b(search|google|look up)\b", text))
+        natural_search_request = any(phrase in text for phrase in ("찾아줘", "찾아봐"))
+        return explicit_search or explicit_lookup or english_search or natural_search_request
+
+    @staticmethod
+    def _is_python_request(text):
+        return (
+            "코드 실행" in text
+            or "파이썬으로" in text
+            or bool(re.match(r"^\s*python\b", text))
+            or ("파이썬" in text and any(verb in text for verb in ("실행해", "계산해")))
+        )

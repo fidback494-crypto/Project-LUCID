@@ -12,6 +12,7 @@ import json
 import os
 from time import monotonic
 
+from src.cognitive.basic_conversation import BasicConversationFallback
 from src.cognitive.cognitive_prompt import CognitivePrompt
 from src.emotion.inner_experience import InnerExperience
 from src.goal.goal import Goal
@@ -80,31 +81,30 @@ class CognitiveEngine(BaseModule):
         started_at = monotonic()
         reply = self.client.generate(
             self._build_messages(state),
-            options={"num_ctx": 4096, "num_predict": 128, "temperature": 0.4},
+            options={"num_ctx": 4096, "num_predict": 192, "temperature": 0.4},
             response_format=self.RESPONSE_SCHEMA,
         )
         elapsed = monotonic() - started_at
         Logger.info(f"[Cognitive] Ollama response received in {elapsed:.1f}s")
 
         upstream_error = reply.strip()
-        if upstream_error == "미안해. 응답 시간이 너무 오래 걸렸어.":
-            response = (
-                "Ollama 응답이 시간 초과됐어. Colab 런타임과 Ollama가 켜져 있는지, "
-                "입력한 Ollama 주소가 현재 세션의 주소인지 확인해 줘."
+        client_metrics = getattr(self.client, "last_metrics", {}) or {}
+        if (
+            client_metrics.get("error")
+            or upstream_error in {
+                "미안해. 응답 시간이 너무 오래 걸렸어.",
+                "미안해. 현재 AI 서버에 연결할 수 없어.",
+                "미안해. AI 처리 중 문제가 발생했어.",
+            }
+        ):
+            response = self._model_unavailable_response(
+                state,
+                user_input,
+                identity_reply,
             )
             state.response = response
             state.voice_response = response
-            Logger.error("[Cognitive] Ollama request timed out; skipped this cognitive update")
-            return response
-
-        if upstream_error == "미안해. 현재 AI 서버에 연결할 수 없어.":
-            response = (
-                "Ollama 서버에 연결되지 않았어. Colab에서 Ollama와 터널이 실행 중인지, "
-                "입력한 주소가 Ollama 터널 주소인지 확인해 줘."
-            )
-            state.response = response
-            state.voice_response = response
-            Logger.error("[Cognitive] Ollama connection failed; skipped this cognitive update")
+            Logger.warning("[Cognitive] Using local fallback because Ollama is unavailable")
             return response
 
         fields = self._parse_fields(reply)
@@ -253,6 +253,10 @@ class CognitiveEngine(BaseModule):
     @staticmethod
     def _safe_fallback(user_input):
 
+        fallback = BasicConversationFallback().respond(user_input)
+        if fallback:
+            return fallback[0], fallback[0]
+
         if CognitiveEngine._contains_hangul(user_input):
             return (
                 "앗, 방금 답변 언어를 헷갈렸어. 한 번만 다시 물어봐 줄래?",
@@ -261,6 +265,56 @@ class CognitiveEngine(BaseModule):
 
         fallback = "I'm here, but I couldn't form a clear reply. Could you ask me once more?"
         return fallback, fallback
+
+    def _model_unavailable_response(self, state, user_input, identity_reply):
+        action = getattr(state, "action", None)
+        action_result = getattr(state, "action_result", None)
+
+        if action and action.need_action and action_result:
+            if action_result.success and action_result.output:
+                output = self._limit_text(action_result.output, 4000)
+                if action.tool == "calculator":
+                    return (
+                        f"계산 결과는 {output}이야."
+                        if self._contains_hangul(user_input)
+                        else f"The result is {output}."
+                    )
+                if action.tool == "python":
+                    return (
+                        f"표현식 결과는 {output}이야."
+                        if self._contains_hangul(user_input)
+                        else f"The expression evaluates to {output}."
+                    )
+                return output
+            if action_result.output:
+                error = self._limit_text(action_result.output, 800)
+                if self._contains_hangul(user_input):
+                    return f"도구 실행이 실패했어: {error}. Ollama도 연결되지 않아 더 설명하기 어려워."
+                return f"The tool failed: {error}. Ollama is also unavailable, so I can't add more detail."
+
+        if identity_reply:
+            return identity_reply
+
+        fallback = BasicConversationFallback().respond(user_input)
+        if fallback:
+            response, speech_style, intent = fallback
+            state.speech_style = speech_style
+            state.reason = Reason(
+                summary="Ollama 연결이 없어 기본 대화 응답으로 이어갔다.",
+                intent=intent,
+                confidence=0.35,
+            )
+            return response
+
+        if self._contains_hangul(user_input):
+            return (
+                "지금은 Ollama 서버가 연결되지 않아 복잡한 답을 만들기 어려워. "
+                "그래도 네 말은 들었어. 서버 연결을 확인한 뒤 이어서 이야기하자."
+            )
+        return (
+            "Ollama isn't connected, so I can't work through a detailed answer right now. "
+            "I hear you, though. Let's continue once the server is available."
+        )
 
     @staticmethod
     def _contains_hangul(text):
@@ -280,8 +334,13 @@ class CognitiveEngine(BaseModule):
     @staticmethod
     def _parse_fields(reply):
 
+        candidate = str(reply or "").strip()
+        if candidate.startswith("```"):
+            candidate = candidate.removeprefix("```json").removeprefix("```JSON")
+            candidate = candidate.removesuffix("```").strip()
+
         try:
-            parsed = json.loads(reply)
+            parsed = json.loads(candidate)
             if isinstance(parsed, dict):
                 fields = {}
                 for key, value in parsed.items():
@@ -293,7 +352,22 @@ class CognitiveEngine(BaseModule):
                     fields[normalized_key] = str(value).strip()
                 return fields
         except (json.JSONDecodeError, TypeError):
-            pass
+            start = candidate.find("{")
+            if start >= 0:
+                try:
+                    parsed, _ = json.JSONDecoder().raw_decode(candidate[start:])
+                    if isinstance(parsed, dict):
+                        fields = {}
+                        for key, value in parsed.items():
+                            if value is None:
+                                continue
+                            normalized_key = str(key).strip().lower()
+                            if normalized_key in {"voice_reply", "voicereply"}:
+                                normalized_key = "spoken_english"
+                            fields[normalized_key] = str(value).strip()
+                        return fields
+                except (json.JSONDecodeError, TypeError):
+                    pass
 
         fields = {}
         allowed = {
