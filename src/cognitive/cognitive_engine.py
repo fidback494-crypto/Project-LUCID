@@ -67,6 +67,7 @@ class CognitiveEngine(BaseModule):
     def stop(self):
 
         Logger.info("Cognitive Engine Stopped")
+        self.client.close()
 
     def process(self, state):
 

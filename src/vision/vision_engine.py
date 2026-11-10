@@ -23,3 +23,6 @@ class VisionEngine:
             Logger.info("[Vision] Screen observation completed")
 
         return observation
+
+    def close(self):
+        self.client.close()

@@ -1,8 +1,10 @@
 """Client for LUCID's Korean Qwen3-TTS Colab service."""
 
 import os
+from queue import Empty, Full, Queue
 import re
 import sys
+from threading import Event, Thread
 
 import requests
 
@@ -39,11 +41,14 @@ class KoreanTTSClient:
         self.timeout = self._read_timeout()
         self.session = requests.Session()
         self.available = False
+        self._speech_queue = Queue(maxsize=1)
+        self._speech_stop = Event()
+        self._speech_thread = None
 
     @staticmethod
     def _read_timeout():
         try:
-            return max(10, int(os.getenv("LUCID_TTS_TIMEOUT", "180")))
+            return max(10, min(int(os.getenv("LUCID_TTS_TIMEOUT", "180")), 600))
         except ValueError:
             return 180
 
@@ -56,6 +61,8 @@ class KoreanTTSClient:
             )
             response.raise_for_status()
             health = response.json()
+            if not isinstance(health, dict):
+                raise ValueError("health response must be a JSON object")
         except (requests.RequestException, ValueError) as error:
             Logger.info(
                 "[Voice] Korean TTS server is unavailable; LUCID will use text only. "
@@ -73,10 +80,83 @@ class KoreanTTSClient:
             return False
 
         self.available = True
+        self._start_speech_worker()
         Logger.info(
             f"[Voice] Korean TTS ready: {health.get('speaker') or self.speaker}"
         )
         return True
+
+    def _start_speech_worker(self):
+        if self._speech_thread is not None and self._speech_thread.is_alive():
+            return
+        self._speech_stop.clear()
+        self._speech_thread = Thread(
+            target=self._run_speech_queue,
+            name="LUCIDKoreanSpeech",
+            daemon=True,
+        )
+        self._speech_thread.start()
+
+    def _run_speech_queue(self):
+        while not self._speech_stop.is_set():
+            try:
+                text, style = self._speech_queue.get(timeout=0.25)
+            except Empty:
+                continue
+            try:
+                if not self._speech_stop.is_set():
+                    self.speak(text, style=style)
+            finally:
+                self._speech_queue.task_done()
+
+    def speak_async(self, text, style="neutral"):
+        """Queue speech without blocking the console or the cognitive loop.
+
+        At most one pending reply is kept. If speech is still playing, a newer
+        reply replaces the queued one so LUCID does not speak stale turns later.
+        """
+        if (
+            not self.available
+            or self._speech_thread is None
+            or not self._speech_thread.is_alive()
+            or sys.platform != "win32"
+            or not text
+            or not str(text).strip()
+        ):
+            return False
+
+        item = (str(text).strip(), style)
+        try:
+            self._speech_queue.put_nowait(item)
+            return True
+        except Full:
+            pass
+
+        try:
+            self._speech_queue.get_nowait()
+            self._speech_queue.task_done()
+        except Empty:
+            pass
+
+        try:
+            self._speech_queue.put_nowait(item)
+            return True
+        except Full:
+            return False
+
+    def stop(self):
+        self.available = False
+        self._speech_stop.set()
+        while True:
+            try:
+                self._speech_queue.get_nowait()
+                self._speech_queue.task_done()
+            except Empty:
+                break
+
+        if self._speech_thread is not None:
+            self._speech_thread.join(timeout=1)
+        self.session.close()
 
     def speak(self, text, style="neutral"):
         if not self.available or not text or not text.strip():

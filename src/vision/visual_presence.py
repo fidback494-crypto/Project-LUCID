@@ -1,5 +1,6 @@
 """A low-frequency, opt-in visual attention loop for LUCID."""
 
+import math
 import os
 import threading
 import time
@@ -14,20 +15,26 @@ class VisualPresence:
         self.page_store = page_store
         self.vision_engine = vision_engine
         self.on_observation = on_observation
-        self.interval = float(
-            os.getenv("LUCID_VISUAL_REACTION_INTERVAL", "12")
-        )
+        try:
+            interval = float(os.getenv("LUCID_VISUAL_REACTION_INTERVAL", "12"))
+            if not math.isfinite(interval):
+                raise ValueError("interval must be finite")
+            self.interval = max(3.0, min(interval, 3600.0))
+        except ValueError:
+            self.interval = 12.0
         self._running = False
         self._thread = None
+        self._stop_event = threading.Event()
         self._last_version = 0
         self._last_reaction_at = 0.0
         self._previous_observation = ""
 
     def start(self):
-        if self._running:
+        if self._running or (self._thread is not None and self._thread.is_alive()):
             return
 
         self._running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._run,
             name="LUCIDVisualPresence",
@@ -40,13 +47,15 @@ class VisualPresence:
 
     def stop(self):
         self._running = False
+        self._stop_event.set()
 
         if self._thread is not None:
             self._thread.join(timeout=2)
-            self._thread = None
+            if not self._thread.is_alive():
+                self._thread = None
 
     def _run(self):
-        while self._running:
+        while self._running and not self._stop_event.is_set():
             page = self.page_store.latest()
 
             if (
@@ -55,13 +64,13 @@ class VisualPresence:
                 or not page.has_image
                 or page.version <= self._last_version
             ):
-                time.sleep(0.5)
+                self._stop_event.wait(0.5)
                 continue
 
             self._last_version = page.version
 
             if time.monotonic() - self._last_reaction_at < self.interval:
-                time.sleep(0.5)
+                self._stop_event.wait(0.5)
                 continue
 
             observation = self.vision_engine.observe(
@@ -79,6 +88,7 @@ class VisualPresence:
 
             if (
                 not self._running
+                or self._stop_event.is_set()
                 or latest_page is None
                 or not latest_page.continuous
             ):
@@ -89,7 +99,7 @@ class VisualPresence:
 
             self._previous_observation = observation
 
-            if self._running:
+            if self._running and not self._stop_event.is_set():
                 Logger.info("[Vision] Continuous screen change noticed")
                 try:
                     self.on_observation(observation)

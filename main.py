@@ -2,8 +2,6 @@ import os
 import getpass
 from urllib.parse import urlsplit
 
-from src.app.lucid import LucidEngine
-
 
 def configure_ollama_address():
 
@@ -82,11 +80,16 @@ def main():
     configure_ollama_address()
     configure_korean_tts_address()
 
+    # Delay the application imports until settings are collected so the first
+    # prompt appears immediately on slower or newly provisioned computers.
+    from src.app.lucid import LucidEngine
+
     lucid = LucidEngine()
-
-    lucid.boot()
-
-    lucid.run()
+    try:
+        lucid.boot()
+        lucid.run()
+    finally:
+        lucid.shutdown()
 
 
 if __name__ == "__main__":

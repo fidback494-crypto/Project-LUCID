@@ -38,9 +38,7 @@ class OllamaClient:
 
         self.generate_url = f"{self.base_url}/api/generate"
 
-        self.timeout = int(
-            os.getenv("LUCID_OLLAMA_TIMEOUT", "300")
-        )
+        self.timeout = self._read_timeout()
         self.keep_alive = os.getenv(
             "LUCID_OLLAMA_KEEP_ALIVE",
             "10m",
@@ -56,6 +54,16 @@ class OllamaClient:
         )
         self.session = requests.Session()
         self.last_metrics = {}
+
+    @staticmethod
+    def _read_timeout():
+        try:
+            return max(5, min(int(os.getenv("LUCID_OLLAMA_TIMEOUT", "300")), 3600))
+        except ValueError:
+            return 300
+
+    def close(self):
+        self.session.close()
 
     def preload(self, timeout=15):
         """Load the text model during startup so its first user turn is warm."""
@@ -187,7 +195,7 @@ class OllamaClient:
             response = self.session.post(
                 self.api_url,
                 json=payload,
-                timeout=self.timeout,
+                timeout=(5, self.timeout),
             )
 
             response.raise_for_status()
@@ -297,7 +305,7 @@ class OllamaClient:
             response = self.session.post(
                 self.generate_url,
                 json=payload,
-                timeout=self.timeout,
+                timeout=(5, self.timeout),
             )
 
             response.raise_for_status()

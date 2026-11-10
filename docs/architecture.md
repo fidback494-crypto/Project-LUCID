@@ -26,7 +26,7 @@
   → 콘솔 출력 및 선택적 한국어 TTS
 ```
 
-일반 텍스트 턴에서 CognitiveEngine은 Ollama를 한 번 호출해 답변과 내부 상태를 함께 만든다. 기본으로 최근 대화 10개 메시지를 보내며, `LUCID_CHAT_HISTORY_MESSAGES`로 0~20개까지 조정한다. 기억 검색과 액션 선택은 로컬 규칙/SQLite를 사용한다. 사용자가 화면을 공유하면 비전 분석 호출이 먼저 추가될 수 있고, 음성 출력은 별도 TTS 서버 호출이다.
+일반 텍스트 턴에서 CognitiveEngine은 Ollama를 한 번 호출해 답변과 내부 상태를 함께 만든다. 기본으로 최근 대화 10개 메시지를 보내며, `LUCID_CHAT_HISTORY_MESSAGES`로 0~20개까지 조정한다. 기억 검색과 액션 선택은 로컬 규칙/SQLite를 사용한다. 사용자가 화면을 공유하면 비전 분석 호출이 먼저 추가될 수 있고, 음성 출력은 별도 TTS 서버 호출이다. 음성 합성과 재생은 전용 작업 스레드에서 돌아 콘솔 입력을 막지 않는다.
 
 ## 실제 사용되는 기관과 준비 상태
 
@@ -36,7 +36,7 @@
 - Ollama가 일시적으로 연결되지 않아도 인사·안부·감사·간단한 공감은 `BasicConversationFallback`이 응답한다. 도구 결과가 이미 성공했다면 해당 결과를 바로 전달한다. 이 로컬 보완 경로는 자유 주제의 일반 답변을 대신하지 않으므로, 그때는 Ollama 연결이 필요하다.
 - `EmotionEngine`, `ReasoningEngine`, `ThoughtEngine`, `GoalEngine`, `PlanningEngine`, `LanguageEngine`은 Kernel에 등록되고 시작되지만, 일반 턴에서 각자의 `process()`는 호출되지 않는다. 이들의 역할 일부는 통합 CognitiveEngine 경로가 맡는다.
 - `Kernel.update()`는 사용자의 텍스트·화면 처리 전에 호출되어 등록된 기관의 업데이트 훅을 실행한다. Heartbeat와 Consciousness는 이 시점마다 이벤트 기반으로 갱신된다.
-- `AutonomousEngine`은 별도 백그라운드 스레드에서 상호작용 없이 기본 300초가 지난 뒤 내부 경험과 자율 목표를 만든다.
+- `AutonomousEngine`은 별도 백그라운드 스레드에서 상호작용 없이 기본 300초가 지난 뒤 내부 경험과 자율 목표를 만든다. 사용자의 입력 처리 중에는 유휴 반성을 멈춰 응답 요청과 Ollama 호출이 겹치지 않게 한다.
 - 일반 콘솔 턴의 Reflection 결과는 현재 고정 요약이며, 응답 품질을 채점하거나 자동으로 모델을 학습시키지는 않는다.
 
 ## 도구

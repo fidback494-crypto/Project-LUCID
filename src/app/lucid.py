@@ -211,6 +211,7 @@ class LucidEngine:
            )
 
         self.running = False
+        self._shutdown_complete = False
 
     def boot(self):
 
@@ -259,6 +260,11 @@ class LucidEngine:
 
                 if not user:
                     continue
+
+                # Mark the interaction before dispatch so the idle reflection
+                # loop does not start a competing Ollama request as the user
+                # begins a turn.
+                self.autonomy.note_interaction()
 
                 if user.lower() in ("exit", "quit"):
 
@@ -523,7 +529,8 @@ class LucidEngine:
                         print("\n예: /screen 화면에 무슨 오류가 보여?")
                         continue
 
-                    observation = self.vision.observe(page, question)
+                    with self.autonomy.interaction():
+                        observation = self.vision.observe(page, question)
 
                     if not observation:
                         print(
@@ -539,25 +546,23 @@ class LucidEngine:
                         else question
                     )
 
-                    with self._life_lock:
-                        self.kernel.update()
-                        reply = self.life.process(
-                            user,
-                            visual_observation=observation,
-                        )
-                        voice_reply = self.workspace.current().voice_response
-                    self._present_reply(reply, voice_reply=voice_reply)
-                    self.autonomy.note_interaction()
+                    with self.autonomy.interaction():
+                        with self._life_lock:
+                            self.kernel.update()
+                            reply = self.life.process(
+                                user,
+                                visual_observation=observation,
+                            )
+                            voice_reply = self.workspace.current().voice_response
+                        self._present_reply(reply, voice_reply=voice_reply)
                     continue
 
-                with self._life_lock:
-                    self.kernel.update()
-                    reply = self.life.process(user)
-                    voice_reply = self.workspace.current().voice_response
-
-                self._present_reply(reply, voice_reply=voice_reply)
-
-                self.autonomy.note_interaction()
+                with self.autonomy.interaction():
+                    with self._life_lock:
+                        self.kernel.update()
+                        reply = self.life.process(user)
+                        voice_reply = self.workspace.current().voice_response
+                    self._present_reply(reply, voice_reply=voice_reply)
 
             except KeyboardInterrupt:
 
@@ -569,13 +574,41 @@ class LucidEngine:
                 Logger.error(str(e))
 
     def shutdown(self):
-
+        if self._shutdown_complete:
+            return
         Logger.info("Shutting Down...")
 
         self.running = False
-        self.kernel.stop()
         self.visual_presence.stop()
         self.browser_bridge.stop()
+        life_idle = self._life_lock.acquire(timeout=2)
+        try:
+            self.kernel.stop()
+
+            for resource_name, cleanup in (
+                ("voice", self.voice.stop),
+                ("vision", self.vision.close),
+            ):
+                try:
+                    cleanup()
+                except Exception as error:
+                    Logger.warning(
+                        f"[Shutdown] {resource_name} cleanup failed: "
+                        f"{type(error).__name__}"
+                    )
+
+            autonomy_thread = getattr(self.autonomy, "_thread", None)
+            autonomy_stopped = autonomy_thread is None or not autonomy_thread.is_alive()
+            if life_idle and autonomy_stopped:
+                self.long_memory.close()
+            else:
+                Logger.warning(
+                    "[Shutdown] SQLite left open because a background task may still use it."
+                )
+        finally:
+            if life_idle:
+                self._life_lock.release()
+            self._shutdown_complete = True
 
     def _on_visual_observation(self, observation):
         """Let LUCID react to a meaningful, user-shared screen change."""
@@ -584,23 +617,27 @@ class LucidEngine:
             return
 
         try:
-            self.autonomy.note_interaction()
+            with self.autonomy.interaction():
+                with self._life_lock:
+                    # Shutdown may have started while this callback waited for
+                    # a foreground turn to release the lock.
+                    if not self.running:
+                        return
 
-            with self._life_lock:
-                self.kernel.update()
-                reply = self.life.process(
-                    "시야에 변화가 있었어. 방금 본 장면을 바탕으로 LUCID답게 "
-                    "한두 문장의 짧은 혼잣말을 해 줘. 사용자의 행동이나 의도를 "
-                    "단정하지 말고, 보이는 사실만 말해.",
-                    visual_observation=observation,
+                    self.kernel.update()
+                    reply = self.life.process(
+                        "시야에 변화가 있었어. 방금 본 장면을 바탕으로 LUCID답게 "
+                        "한두 문장의 짧은 혼잣말을 해 줘. 사용자의 행동이나 의도를 "
+                        "단정하지 말고, 보이는 사실만 말해.",
+                        visual_observation=observation,
+                    )
+                    voice_reply = self.workspace.current().voice_response
+
+                self._present_reply(
+                    reply,
+                    label="LUCID [beside you] >",
+                    voice_reply=voice_reply,
                 )
-                voice_reply = self.workspace.current().voice_response
-
-            self._present_reply(
-                reply,
-                label="LUCID [beside you] >",
-                voice_reply=voice_reply,
-            )
 
         except Exception as error:
             Logger.error(f"[Vision Presence] {error}")
@@ -608,4 +645,9 @@ class LucidEngine:
     def _present_reply(self, reply, label="LUCID >", voice_reply=None):
         print(f"\n{label} {reply}")
         speech_style = getattr(self.workspace.current(), "speech_style", "neutral")
-        self.voice.speak(voice_reply or reply, style=speech_style)
+        speech = voice_reply or reply
+        enqueue = getattr(self.voice, "speak_async", None)
+        if callable(enqueue):
+            enqueue(speech, style=speech_style)
+        else:
+            self.voice.speak(speech, style=speech_style)

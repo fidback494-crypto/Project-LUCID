@@ -15,7 +15,11 @@ class BrowserBridge:
 
     def __init__(self, store):
         self.store = store
-        self.port = int(os.getenv("LUCID_BROWSER_PORT", "8765"))
+        try:
+            port = int(os.getenv("LUCID_BROWSER_PORT", "8765"))
+            self.port = port if 1 <= port <= 65535 else 8765
+        except ValueError:
+            self.port = 8765
         self.token = self._load_token()
         self._server = None
         self._thread = None
@@ -141,6 +145,8 @@ class BrowserBridge:
 
         self._server.shutdown()
         self._server.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=2)
         self._server = None
         self._thread = None
         Logger.info("[Browser] Local bridge stopped")

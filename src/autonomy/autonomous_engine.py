@@ -8,6 +8,7 @@ Module : Autonomous Engine
 Creator : 시드
 """
 
+from contextlib import contextmanager
 from threading import Event, Lock, Thread
 from time import monotonic
 
@@ -46,6 +47,7 @@ class AutonomousEngine(BaseModule):
         self._last_interaction = monotonic()
         self._next_reflection_at = 0.0
         self._failure_streak = 0
+        self._active_interactions = 0
 
     def start(self):
 
@@ -78,6 +80,8 @@ class AutonomousEngine(BaseModule):
 
             self._thread.join(timeout=3)
 
+        self.client.close()
+
         Logger.info("Autonomous Engine Stopped")
 
     def note_interaction(self):
@@ -87,6 +91,19 @@ class AutonomousEngine(BaseModule):
 
             self._last_interaction = monotonic()
 
+    @contextmanager
+    def interaction(self):
+        """Pause idle reflection for the duration of a foreground turn."""
+        with self._state_lock:
+            self._active_interactions += 1
+            self._last_interaction = monotonic()
+        try:
+            yield
+        finally:
+            with self._state_lock:
+                self._active_interactions = max(0, self._active_interactions - 1)
+                self._last_interaction = monotonic()
+
     def reflect_once(self):
         """Create one private inner experience. Public for deterministic tests."""
 
@@ -95,7 +112,12 @@ class AutonomousEngine(BaseModule):
         try:
 
             reply = self.client.generate(
-                [{"role": "system", "content": prompt}]
+                [{"role": "system", "content": prompt}],
+                options={
+                    "num_ctx": 2048,
+                    "num_predict": 220,
+                    "temperature": 0.65,
+                },
             )
 
             experience = self._parse_experience(reply)
@@ -108,17 +130,20 @@ class AutonomousEngine(BaseModule):
                 )
                 return None
 
+            with self._state_lock:
+                if self._stop_event.is_set() or self._active_interactions > 0:
+                    return None
+
+                self.self_model.emotion.integrate(experience)
+                self.long_memory.store_inner_experience(experience)
+                self.self_model.autonomous_goal = goal
+                self.long_memory.set_autonomous_goal(goal)
+
         except Exception as e:
 
             Logger.error(f"[Autonomy] Inner reflection failed : {e}")
 
             return None
-
-        self.self_model.emotion.integrate(experience)
-        self.long_memory.store_inner_experience(experience)
-
-        self.self_model.autonomous_goal = goal
-        self.long_memory.set_autonomous_goal(goal)
 
         Logger.info(
             "[Autonomy] Inner reflection : "
@@ -133,7 +158,7 @@ class AutonomousEngine(BaseModule):
 
     def _run(self):
 
-        while not self._stop_event.wait(1):
+        while not self._stop_event.wait(5):
 
             now = monotonic()
 
@@ -141,10 +166,12 @@ class AutonomousEngine(BaseModule):
 
                 idle_for = now - self._last_interaction
                 retry_is_due = now >= self._next_reflection_at
+                interaction_is_active = self._active_interactions > 0
 
             if (
                 idle_for >= self.idle_interval_seconds
                 and retry_is_due
+                and not interaction_is_active
             ):
 
                 experience = self.reflect_once()

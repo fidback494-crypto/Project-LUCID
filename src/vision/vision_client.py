@@ -16,8 +16,14 @@ class VisionClient:
             os.getenv("LUCID_OLLAMA_URL", "http://127.0.0.1:11434"),
         ).strip().rstrip("/")
         self.model = os.getenv("LUCID_VISION_MODEL", "gemma3:12b")
-        self.timeout = int(os.getenv("LUCID_VISION_TIMEOUT", "300"))
+        try:
+            self.timeout = max(5, min(int(os.getenv("LUCID_VISION_TIMEOUT", "300")), 3600))
+        except ValueError:
+            self.timeout = 300
         self.session = requests.Session()
+
+    def close(self):
+        self.session.close()
 
     def observe(self, image_base64, question, previous_observation=""):
         comparison = (
@@ -48,13 +54,18 @@ class VisionClient:
                     "images": [image_base64],
                 },
             ],
+            "options": {
+                "num_ctx": 4096,
+                "num_predict": 160,
+                "temperature": 0.2,
+            },
         }
 
         try:
             response = self.session.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
-                timeout=self.timeout,
+                timeout=(5, self.timeout),
             )
             response.raise_for_status()
             content = response.json().get("message", {}).get("content", "")
