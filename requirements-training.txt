@@ -1,0 +1,8 @@
+# Install in a separate Colab training runtime; do not add to the app environment.
+accelerate
+bitsandbytes
+datasets
+peft
+torch
+transformers
+trl

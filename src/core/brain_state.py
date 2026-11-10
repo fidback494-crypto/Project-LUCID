@@ -30,6 +30,7 @@ class BrainState:
     decision: object | None = None
     response: str = ""
     voice_response: str = ""
+    speech_style: str = "neutral"
 
     # =====================================
     # Self

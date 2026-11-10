@@ -8,8 +8,11 @@ Application : LUCID
 Creator : 시드
 """
 from src.action.tools.memory_tool import MemoryTool
-from src.action.tools.calculator_tool import CalculatorTool
+from src.action.tools.calculator import CalculatorTool
+from src.action.tools.file_tool import FileTool
+from src.action.tools.python_tool import PythonTool
 from src.action.tools.time_tool import TimeTool
+from src.action.tools.web_tool import WebTool
 from src.action.action_engine import ActionEngine
 from src.workspace.workspace_engine import WorkspaceEngine
 from src.emotion.emotion_engine import EmotionEngine
@@ -18,7 +21,7 @@ from src.cognitive.cognitive_engine import CognitiveEngine
 from src.browser import BrowserBridge, PageContextStore
 from src.vision import VisionEngine
 from src.vision import VisualPresence
-from src.voice import UtauTTSClient
+from src.voice import KoreanTTSClient
 from src.kernel.kernel import Kernel
 from src.conversation.conversation_manager import ConversationManager
 
@@ -67,6 +70,9 @@ class LucidEngine:
              "calculator",
              CalculatorTool(),
         )
+        self.action.register("file", FileTool())
+        self.action.register("python", PythonTool())
+        self.action.register("web", WebTool())
       
         self.workspace = WorkspaceEngine()
 
@@ -120,7 +126,7 @@ class LucidEngine:
         self.browser_context = PageContextStore()
         self.browser_bridge = BrowserBridge(self.browser_context)
         self.vision = VisionEngine()
-        self.voice = UtauTTSClient()
+        self.voice = KoreanTTSClient()
         self._life_lock = RLock()
         self.visual_presence = VisualPresence(
             self.browser_context,
@@ -360,6 +366,14 @@ class LucidEngine:
 
                     continue
 
+                if user == "/tools":
+
+                    print("\n========== Registered Tools ==========")
+                    print(", ".join(self.action.registry.names()))
+                    print("파일 도구는 프로젝트 안의 읽기 전용, Python 도구는 안전한 표현식만 실행해.")
+
+                    continue
+
                 if user == "/inner":
 
                     print("\n========== Inner Life ==========")
@@ -526,6 +540,7 @@ class LucidEngine:
                     )
 
                     with self._life_lock:
+                        self.kernel.update()
                         reply = self.life.process(
                             user,
                             visual_observation=observation,
@@ -536,6 +551,7 @@ class LucidEngine:
                     continue
 
                 with self._life_lock:
+                    self.kernel.update()
                     reply = self.life.process(user)
                     voice_reply = self.workspace.current().voice_response
 
@@ -571,6 +587,7 @@ class LucidEngine:
             self.autonomy.note_interaction()
 
             with self._life_lock:
+                self.kernel.update()
                 reply = self.life.process(
                     "시야에 변화가 있었어. 방금 본 장면을 바탕으로 LUCID답게 "
                     "한두 문장의 짧은 혼잣말을 해 줘. 사용자의 행동이나 의도를 "
@@ -590,4 +607,5 @@ class LucidEngine:
 
     def _present_reply(self, reply, label="LUCID >", voice_reply=None):
         print(f"\n{label} {reply}")
-        self.voice.speak(voice_reply or reply)
+        speech_style = getattr(self.workspace.current(), "speech_style", "neutral")
+        self.voice.speak(voice_reply or reply, style=speech_style)

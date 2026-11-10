@@ -235,6 +235,7 @@ class LifeLoop:
 
         workspace.response = state.response
         workspace.voice_response = state.voice_response
+        workspace.speech_style = state.speech_style
         workspace.emotion = state.emotion
         workspace.reason = state.reason
         workspace.thought = state.thought

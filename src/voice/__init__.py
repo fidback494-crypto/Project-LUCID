@@ -1,5 +1,8 @@
 """Optional speech output integrations."""
 
-from .utautts_client import UtauTTSClient
+from .korean_tts_client import KoreanTTSClient
 
-__all__ = ["UtauTTSClient"]
+# Keep the historical import name available for external integrations.
+UtauTTSClient = KoreanTTSClient
+
+__all__ = ["KoreanTTSClient", "UtauTTSClient"]

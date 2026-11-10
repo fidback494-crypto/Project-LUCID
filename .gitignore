@@ -221,3 +221,8 @@ __marimo__/
 lucid_memory.db
 data/*.db
 data/browser_bridge_token.txt
+
+# Local reviewed dialogue corpus splits and fine-tuning artifacts
+training/dialogue/split/
+training/dialogue/private/
+training/output/

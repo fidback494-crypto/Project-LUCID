@@ -163,6 +163,8 @@ class OllamaClient:
         self,
         messages,
         think=False,
+        options=None,
+        response_format=None,
     ):
 
         payload = {
@@ -171,6 +173,14 @@ class OllamaClient:
             "stream": False,
             "keep_alive": self.keep_alive,
         }
+        if options:
+            payload["options"] = options
+        if response_format is not None:
+            payload["format"] = response_format
+        if think:
+            payload["think"] = True
+
+        started_at = monotonic()
 
         try:
 
@@ -183,6 +193,7 @@ class OllamaClient:
             response.raise_for_status()
 
             data = response.json()
+            self._record_metrics(data, monotonic() - started_at, "chat")
 
             message = data.get("message", {})
 
@@ -203,8 +214,13 @@ class OllamaClient:
 
         except requests.exceptions.Timeout:
 
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
+
             Logger.error(
-                "[Ollama] Request Timeout"
+                "[Ollama] Chat Timeout"
             )
 
             return (
@@ -213,25 +229,31 @@ class OllamaClient:
 
         except requests.exceptions.ConnectionError:
 
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
+
             Logger.error(
-                "[Ollama] Failed to connect to "
-                "Google Colab Ollama"
+                "[Ollama] Failed to connect to the configured server"
             )
 
             return (
-                "미안해. 현재 LUCID의 AI 서버에 "
-                "연결할 수 없어."
+                "미안해. 현재 AI 서버에 연결할 수 없어."
             )
 
         except Exception as e:
 
+            self.last_metrics = {
+                "request_wall_seconds": monotonic() - started_at,
+                "error": True,
+            }
+
             Logger.error(
-                f"[Ollama] Error : {e}"
+                f"[Ollama] Chat Error : {e}"
             )
 
-            return (
-                "미안해. AI 처리 중 문제가 발생했어."
-            )
+            return "미안해. AI 처리 중 문제가 발생했어."
 
     # =============================================
     # Generate
@@ -246,39 +268,16 @@ class OllamaClient:
 
         self.last_metrics = {}
 
-        # -----------------------------------------
-        # messages가 문자열인 경우
-        # -----------------------------------------
+        # Preserve message roles through Ollama's chat endpoint. Plain prompts
+        # still use /api/generate for callers that intentionally pass a string.
+        if not isinstance(messages, str):
+            return self.chat(
+                messages,
+                options=options,
+                response_format=response_format,
+            )
 
-        if isinstance(messages, str):
-
-            prompt = messages
-
-        else:
-
-            # -------------------------------------
-            # Chat 형식 → 하나의 Prompt로 변환
-            # -------------------------------------
-
-            parts = []
-
-            for message in messages:
-
-                role = message.get(
-                    "role",
-                    "user",
-                )
-
-                content = message.get(
-                    "content",
-                    "",
-                )
-
-                parts.append(
-                    f"{role}: {content}"
-                )
-
-            prompt = "\n\n".join(parts)
+        prompt = messages
 
         payload = {
             "model": self.model,

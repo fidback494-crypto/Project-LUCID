@@ -52,6 +52,7 @@ class Workspace:
         # 응답
         self.response = None
         self.voice_response = None
+        self.speech_style = "neutral"
 
         # 반성
         self.reflection = None
@@ -81,6 +82,7 @@ class Workspace:
 
         self.response = None
         self.voice_response = None
+        self.speech_style = "neutral"
         self.reflection = None
         self.experience = None
 

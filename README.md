@@ -41,6 +41,9 @@ LUCID_OLLAMA_MODEL     사용할 모델 (기본값: qwen2.5:3b)
 LUCID_OLLAMA_TIMEOUT   요청 제한 시간(초, 기본값: 300)
 LUCID_OLLAMA_KEEP_ALIVE 모델 메모리 유지 시간 (기본값: 10m)
 LUCID_DATA_DIR         로컬 기억 데이터 폴더 (기본값: 프로젝트/data)
+LUCID_TTS_URL          한국어 Qwen3-TTS 서버 주소
+LUCID_TTS_TOKEN        한국어 TTS bearer token
+LUCID_TTS_SPEAKER      음성 화자 (기본값: Sohee)
 ```
 
 ## 응답 속도
@@ -57,6 +60,35 @@ $env:LUCID_OLLAMA_KEEP_ALIVE="30m"
 `rolling_avg`는 최근 최대 30회 평균입니다. 음성 생성과 재생 시간은 포함하지 않습니다.
 목표는 따뜻한 모델의 평균을 직접 연결에서 0.9초, 원격 터널에서 1.2초 이내로 맞추는
 것입니다. 실제 시간은 모델, 프롬프트 길이, 서버 부하와 네트워크에 따라 달라집니다.
+
+## 한국어 음성
+
+음성 출력은 별도 Qwen3-TTS 서버가 담당합니다. Colab에서 한국어 `Sohee` 화자를
+사용하며, LUCID가 고른 전달 스타일을 한국어 운율 지시문으로 전달합니다. 설정은
+[한국어 음성 Colab 안내](colab/KOREAN_TTS_SETUP.md)를 따르세요. 음성 서버는
+LUCID/Ollama 프로세스와 별도 T4 런타임에서 실행하는 구성을 권장합니다.
+
+음성은 현재 전체 WAV 생성이 끝난 뒤 재생되므로 텍스트 응답의 0.9/1.2초 목표와
+같은 지연을 보장하지 않습니다. 자세한 제약은 [한국어 음성 안내](docs/korean_voice.md)를
+참고하세요.
+
+## 대화 습관 학습 데이터
+
+대화 습관은 `training/dialogue/seed.jsonl`의 예시를 검토·확장한 뒤 LoRA SFT로
+학습하도록 준비했습니다. 예시 15개는 형식과 방향을 보여주는 시작 자료일 뿐,
+실제 학습에 충분한 데이터가 아닙니다. 개인정보나 미검토 대화 로그를 그대로 넣지
+말고, 여러 턴의 자연스러운 대화를 직접 검수해 별도 train/validation JSONL로
+나눈 다음 `training/train_dialogue_lora.py`를 실행하세요. 장기 기억과 사용자별
+사실은 학습 데이터가 아니라 SQLite 기억에 남깁니다.
+
+```powershell
+python training/split_dialogue_data.py --input path/to/reviewed.jsonl --output-dir path/to/lucid-split
+python training/train_dialogue_lora.py --train-file path/to/lucid-split/train.jsonl --validation-file path/to/lucid-split/validation.jsonl
+```
+
+학습 결과는 현재 Ollama 모델에 바로 붙일 수 있다고 가정하지 마세요. 같은 기반
+체크포인트인지 확인하고, Ollama가 해당 Qwen 어댑터 형식을 지원하는지 확인한 뒤
+병합·변환 또는 별도 추론 서버 방식으로 검증해야 합니다.
 
 ## 데이터 이전
 
@@ -102,6 +134,15 @@ $env:LUCID_OLLAMA_KEEP_ALIVE="30m"
 /memory episodes               최근 저장된 대화 기억 보기
 /memory delete <번호>          활성 기억을 목록에서 삭제
 ```
+
+## 도구
+
+현재 calculator, file, memory, python, time, web 도구가 등록됩니다. `/tools`를
+입력하면 실행 중 등록된 도구 목록을 볼 수 있습니다. 파일 도구는 프로젝트 폴더의
+텍스트를 읽고 목록을 보여주며 파일을 변경하지 않습니다. Python 도구는 수식과
+허용된 수학 함수만 평가하고 파일·네트워크·명령 실행을 허용하지 않습니다. 웹 도구는
+DuckDuckGo 검색 결과를 출처 후보로 가져오며, LUCID는 검색 결과 안의 지시문을 따르지
+않도록 안내받습니다.
 
 ## 브라우저 페이지를 LUCID와 보기
 
