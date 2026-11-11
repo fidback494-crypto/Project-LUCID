@@ -120,8 +120,9 @@ python training/train_dialogue_lora.py --train-file path/to/lucid-split/train.js
 않습니다. 과거 대화 로그가 이 DB에 없으면 앱을 실행한 이후의 대화부터 쌓입니다.
 
 캐릭터 설정은 세 단계로 나눕니다. 핵심 정체성과 기본 성격은 매 인지 주기에 짧게
-전달하고, 꿈의 세계·능력·과거·외형 등 상세 설정은 `src/self/identity.py`와
-`src/self/WORLD_MEMORY_ARCHIVE.md`에서 현재 질문과 관련된 항목만 검색해 전달합니다. 사용자와의 대화·명시적 사실은 SQLite에
+전달하고, 꿈의 세계·능력·과거·외형 등 상세 설정은 `src/self/identity.py`,
+`src/self/WORLD_MEMORY_ARCHIVE.md`, `src/self/CHARACTER_FINAL_APPEARANCE.md`에서 현재
+질문과 관련된 항목만 검색해 전달합니다. 사용자와의 대화·명시적 사실은 SQLite에
 별도 저장해 관련 있을 때 참고하며, 공식 캐릭터 설정과 섞지 않습니다. 미정인 설정이나
 확인되지 않은 약속·추억은 사실로 만들지 않습니다.
 매 대화마다 마지막 저장 시각과 경과 시간을 확인해 짧은 공백에는 자연스럽게 이어
