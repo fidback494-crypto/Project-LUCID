@@ -172,10 +172,10 @@ class CognitiveEngine(BaseModule):
         """Keep the system prompt, prior turns, and current user turn separate."""
 
         try:
-            history_limit = int(os.getenv("LUCID_CHAT_HISTORY_MESSAGES", "10"))
+            history_limit = int(os.getenv("LUCID_CHAT_HISTORY_MESSAGES", "6"))
         except ValueError:
-            history_limit = 10
-        history_limit = max(0, min(history_limit, 20))
+            history_limit = 6
+        history_limit = max(0, min(history_limit, 8))
 
         messages = [{"role": "system", "content": self._build_prompt(state)}]
         history = state.conversation[-history_limit:] if history_limit else []
@@ -188,7 +188,7 @@ class CognitiveEngine(BaseModule):
                 continue
             messages.append({
                 "role": role,
-                "content": self._limit_text(content, 800),
+                "content": self._limit_text(content, 400),
             })
 
         messages.append({
@@ -211,14 +211,17 @@ class CognitiveEngine(BaseModule):
     def _compact_identity_prompt(identity):
 
         traits = " ".join(identity.personality)
+        roleplay = " ".join(identity.roleplay_guidelines)
         return (
             f"이름: {identity.name} ({identity.alias}). "
             f"정체성: {identity.archetype}, {identity.species}. "
             f"나이: {identity.age}, 생일: {identity.birthday}, 키: {identity.height}. "
             f"사는 곳: {identity.home}. 배경: {identity.origin} "
             f"성격: {traits} "
+            f"역할 연기 지침: {roleplay} "
             "기본 말투는 반말이며 상황에 따라 존댓말이나 반존대를 쓴다. "
-            "차분하고 호기심 많게 말하고, 확인되지 않은 사용자와의 추억을 만들지 않는다."
+            "설정을 매번 설명하지 말고 말투와 반응에 자연스럽게 드러낸다. "
+            "사용자가 실제 AI나 프로그램의 정체를 직접 물으면 사실대로 답한다."
         )
 
     @staticmethod
@@ -247,9 +250,12 @@ class CognitiveEngine(BaseModule):
     def _limit_text(value, limit):
 
         text = str(value or "").strip()
+        limit = max(0, int(limit))
+        if limit == 0:
+            return ""
         if len(text) <= limit:
             return text
-        return text[:limit].rstrip() + "…"
+        return text[:limit - 1].rstrip() + "…"
 
     @staticmethod
     def _safe_fallback(user_input):
