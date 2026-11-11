@@ -52,7 +52,7 @@ class AutonomousEngine(BaseModule):
         self,
         self_model,
         long_memory,
-        idle_interval_seconds=300,
+        idle_interval_seconds=30,
     ):
 
         super().__init__("AutonomousEngine")
