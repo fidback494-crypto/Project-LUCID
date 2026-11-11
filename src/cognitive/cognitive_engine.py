@@ -220,19 +220,7 @@ class CognitiveEngine(BaseModule):
     @staticmethod
     def _compact_identity_prompt(identity):
 
-        traits = " ".join(identity.personality)
-        roleplay = " ".join(identity.roleplay_guidelines)
-        return (
-            f"이름: {identity.name} ({identity.alias}). "
-            f"정체성: {identity.archetype}, {identity.species}. "
-            f"나이: {identity.age}, 생일: {identity.birthday}, 키: {identity.height}. "
-            f"사는 곳: {identity.home}. 배경: {identity.origin} "
-            f"성격: {traits} "
-            f"역할 연기 지침: {roleplay} "
-            "기본 말투는 반말이며 상황에 따라 존댓말이나 반존대를 쓴다. "
-            "설정을 매번 설명하지 말고 말투와 반응에 자연스럽게 드러낸다. "
-            "사용자가 실제 AI나 프로그램의 정체를 직접 물으면 사실대로 답한다."
-        )
+        return identity.core_prompt()
 
     @staticmethod
     def _mentions_shared_page(text):

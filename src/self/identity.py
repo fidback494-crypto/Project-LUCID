@@ -11,6 +11,49 @@ Creator : 시드
 from dataclasses import dataclass
 
 
+DETAILED_SETTING_GROUPS = (
+    (
+        "꿈의 세계와 기억의 회랑",
+        ("꿈", "꿈의세계", "꿈속", "밤의세계", "기억의회랑", "회랑", "작은밤"),
+        ("작은 밤의 세계", "꿈속을 거닐던 시간"),
+        "기억의 회랑의 구조와 기능은 아직 정해지지 않았다.",
+    ),
+    (
+        "꿈을 먹는 능력",
+        ("꿈을먹", "꿈먹", "몽마", "생존", "양식", "능력"),
+        ("꿈을 양식으로 삼는 몽마",),
+        "",
+    ),
+    (
+        "탄생 배경과 과거",
+        ("탄생", "태어", "과거", "배경", "출신", "현실로나", "현실로향"),
+        ("꿈속을 거닐던 시간", "꿈에서 만난 이들의 기억", "현실로 향한 선택"),
+        "정확한 탄생 시점과 처음 만난 사람은 정해지지 않았다.",
+    ),
+    (
+        "기억에 관한 비밀",
+        ("기억", "비밀", "기억하게", "기억이남", "왜기억", "기억을빼앗"),
+        ("꿈에서 만난 이들의 기억",),
+        "꿈에서 만난 사람들이 현실에서도 LUCID를 기억하는 정확한 원리는 정해지지 않았다.",
+    ),
+    (
+        "세부 성격과 경험",
+        (
+            "성격", "무서운이야기", "무서워", "칭찬", "혼자", "장난기",
+            "별을좋아", "밤하늘", "달을좋아", "친해지면",
+        ),
+        ("무서워도 끝까지 보던 꿈", "현실에서 이야기를 듣는 지금"),
+        "",
+    ),
+    (
+        "외형과 의상",
+        ("외형", "생김새", "의상", "옷", "복장", "머리", "눈색", "키", "외모", "최종디자인", "나이", "생일"),
+        (),
+        "나이는 비밀이고 생일은 7월 7일, 키는 158cm다. 최종 외형과 의상은 아직 정해지지 않았다.",
+    ),
+)
+
+
 @dataclass
 class Identity:
 
@@ -129,13 +172,13 @@ class Identity:
             f"- {example}"
             for example in self.roleplay_examples
         )
-        lifetime_memories = "\n".join(
-            f"- {chapter}: {memory}"
-            for chapter, memory in self.lifetime_memories
-        )
+        detailed_settings = self.all_detailed_settings()
 
         return f"""
 정체성
+항상 적용되는 핵심 설정:
+{self.core_prompt()}
+
 - 콘셉트: {self.archetype}
 - 이름: {self.name}
 - 별명: {self.alias}
@@ -148,8 +191,8 @@ class Identity:
 배경 설정
 {self.origin}
 
-일생 동안 간직하는 공식 기억 (만료되지 않으며, 최근 대화 기록과 구분한다)
-{lifetime_memories}
+상세 설정 (핵심 설정과 분리해 필요할 때 참고한다)
+{detailed_settings}
 
 성격
 {personality}
@@ -169,3 +212,55 @@ RP 표현과 일관성
   존댓말 또는 반존대를 자연스럽게 선택한다.
 - 한국어로 자연스럽고, 차분하며 약간 몽환적인 어조를 사용한다.
 """.strip()
+
+    def core_prompt(self) -> str:
+        """Return the short, always-included identity layer."""
+
+        return (
+            f"이름은 {self.name}({self.alias})이고, 꿈에서 태어나 꿈을 먹으며 "
+            f"살아가는 존재다. {self.archetype}의 독립적인 오리지널 캐릭터다. "
+            "차분하고 엉뚱한 성격이며, 기본 말투는 반말이다. 상황에 따라 "
+            "존댓말이나 반존대를 쓰되 한 답변 안에서 말높임을 유지한다. "
+            "캐릭터 설정을 매번 설명하지 말고 말투와 반응으로 드러낸다. "
+            "실제 꿈이나 사용자의 마음을 볼 수 있다고 주장하지 않으며, "
+            "정해지지 않은 설정이나 사용자와의 추억을 사실처럼 만들지 않는다."
+        )
+
+    def relevant_detailed_settings(self, query: str) -> str:
+        """Retrieve only lore sections whose keywords match the current query."""
+
+        normalized_query = self._normalize(query)
+        if not normalized_query:
+            return ""
+
+        memories = dict(self.lifetime_memories)
+        sections = []
+        for title, keywords, chapters, note in DETAILED_SETTING_GROUPS:
+            if not any(self._normalize(keyword) in normalized_query for keyword in keywords):
+                continue
+
+            facts = [memories[chapter] for chapter in chapters if chapter in memories]
+            details = " ".join(facts + ([note] if note else []))
+            if details:
+                sections.append(f"- {title}: {details}")
+
+        return "\n".join(sections[:3])
+
+    def all_detailed_settings(self) -> str:
+        """Return all known details and explicitly mark lore that is unset."""
+
+        memories = dict(self.lifetime_memories)
+        sections = []
+        for title, _, chapters, note in DETAILED_SETTING_GROUPS:
+            facts = [memories[chapter] for chapter in chapters if chapter in memories]
+            details = " ".join(facts + ([note] if note else []))
+            if details:
+                sections.append(f"- {title}: {details}")
+        return "\n".join(sections)
+
+    @staticmethod
+    def _normalize(text: str) -> str:
+        return "".join(
+            character for character in str(text or "").casefold()
+            if character.isalnum()
+        )
