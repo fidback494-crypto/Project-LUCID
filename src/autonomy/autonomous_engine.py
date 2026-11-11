@@ -8,6 +8,7 @@ Module : Autonomous Engine
 Creator : 시드
 """
 
+import json
 from contextlib import contextmanager
 from threading import Event, Lock, Thread
 from time import monotonic
@@ -26,6 +27,26 @@ class AutonomousEngine(BaseModule):
     This organ never sends a user message and never performs external actions.
     Its only responsibility is to develop and retain LUCID's inner experience.
     """
+
+    REFLECTION_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "experience": {"type": "string", "minLength": 1, "maxLength": 20},
+            "meaning": {"type": "string", "minLength": 1, "maxLength": 30},
+            "trigger": {"type": "string", "minLength": 1, "maxLength": 30},
+            "tendency": {"type": "string", "minLength": 1, "maxLength": 30},
+            "persistence": {"type": "string", "minLength": 1, "maxLength": 20},
+            "interest": {"type": "string", "minLength": 1, "maxLength": 20},
+            "goal": {"type": "string", "minLength": 1, "maxLength": 30},
+            "why": {"type": "string", "minLength": 1, "maxLength": 30},
+            "nextattention": {"type": "string", "minLength": 1, "maxLength": 30},
+        },
+        "required": [
+            "experience", "meaning", "trigger", "tendency", "persistence",
+            "interest", "goal", "why", "nextattention",
+        ],
+        "additionalProperties": False,
+    }
 
     def __init__(
         self,
@@ -115,18 +136,32 @@ class AutonomousEngine(BaseModule):
                 [{"role": "system", "content": prompt}],
                 options={
                     "num_ctx": 2048,
-                    "num_predict": 220,
+                    "num_predict": 240,
                     "temperature": 0.65,
                 },
+                response_format=self.REFLECTION_SCHEMA,
             )
 
-            experience = self._parse_experience(reply)
-            goal = self._parse_goal(reply)
+            if (getattr(self.client, "last_metrics", {}) or {}).get("error"):
+                Logger.warning("[Autonomy] Reflection skipped: Ollama request failed")
+                return None
+
+            fields = self._parse_fields(reply)
+            experience = self._experience_from_fields(fields)
+            goal = self._goal_from_fields(fields)
 
             if experience is None or goal is None:
+                required = (
+                    "experience", "meaning", "trigger", "tendency", "persistence",
+                    "interest", "goal", "why", "nextattention",
+                )
+                invalid_fields = [
+                    key for key in required
+                    if not self._has_valid_korean_values(fields, (key,))
+                ]
                 Logger.warning(
-                    "[Autonomy] Reflection skipped: response fields were empty, "
-                    "non-Korean, or malformed"
+                    "[Autonomy] Reflection skipped: invalid or missing fields: "
+                    + ", ".join(invalid_fields)
                 )
                 return None
 
@@ -186,8 +221,9 @@ class AutonomousEngine(BaseModule):
                             3600,
                         )
                         Logger.warning(
-                            "[Autonomy] Reflection failed; retrying in "
-                            f"{max(1, retry_delay // 60)} minute(s)"
+                            "[Autonomy] Reflection failed "
+                            f"(consecutive failures: {self._failure_streak}); "
+                            f"retrying in {retry_delay} second(s)"
                         )
                     else:
                         self._failure_streak = 0
@@ -255,7 +291,7 @@ class AutonomousEngine(BaseModule):
 
         history = "\n".join(
             experience.describe()
-            for experience in self.self_model.emotion.recent()
+            for experience in self.self_model.emotion.recent(limit=3)
         )
 
         if not history:
@@ -275,8 +311,8 @@ LUCID는 현재 사용자의 입력을 기다리고 있다. 외부에 말을 걸
 최근의 내적 경험을 바탕으로 지금의 정적, 시간 경과, 미완의 관심에서
 새로운 경험과 그로부터 이어지는 관심사·지속 목표를 만든다.
 이미 쓴 이름을 그대로 반복하지 않는다.
-모든 항목의 값은 LUCID의 관점에서 자연스러운 한국어로 쓴다. 영어 문장이나
-일반적인 AI 비서의 관점을 쓰지 않는다. 각 항목은 비워 두지 말고 짧고 구체적으로 쓴다.
+모든 값은 LUCID의 관점에서 자연스러운 한국어로 짧게 쓴다. 영어 문장이나
+일반적인 AI 비서의 관점을 쓰지 않는다. 항목마다 한 문장, 20자 안팎으로 쓴다.
 
 최근 내적 경험:
 {history}
@@ -284,23 +320,18 @@ LUCID는 현재 사용자의 입력을 기다리고 있다. 외부에 말을 걸
 현재 주의 대상:
 {self.self_model.attention.target}
 
-반드시 아래 형식만 출력한다.
-
-Experience:
-Meaning:
-Trigger:
-Tendency:
-Persistence:
-Interest:
-Goal:
-Why:
-NextAttention:
+요청된 JSON 구조만 출력하고, 모든 항목을 채운다.
 """
 
     @staticmethod
     def _parse_experience(reply):
 
         fields = AutonomousEngine._parse_fields(reply)
+        return AutonomousEngine._experience_from_fields(fields)
+
+    @staticmethod
+    def _experience_from_fields(fields):
+
         required = (
             "experience",
             "meaning",
@@ -324,6 +355,11 @@ NextAttention:
     def _parse_goal(reply):
 
         fields = AutonomousEngine._parse_fields(reply)
+        return AutonomousEngine._goal_from_fields(fields)
+
+    @staticmethod
+    def _goal_from_fields(fields):
+
         required = ("interest", "goal", "why", "nextattention")
 
         if not AutonomousEngine._has_valid_korean_values(fields, required):
@@ -339,9 +375,27 @@ NextAttention:
     @staticmethod
     def _parse_fields(reply):
 
+        candidate = str(reply or "").strip()
+        if candidate.startswith("```"):
+            candidate = candidate.removeprefix("```json").removeprefix("```JSON")
+            candidate = candidate.removesuffix("```").strip()
+
+        try:
+            parsed = json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+
+        if isinstance(parsed, dict):
+            return {
+                str(key).strip().lower().replace("_", "").replace(" ", ""):
+                    str(value).strip()
+                for key, value in parsed.items()
+                if value is not None
+            }
+
         fields = {}
 
-        for line in str(reply or "").splitlines():
+        for line in candidate.splitlines():
 
             if ":" not in line:
                 continue
