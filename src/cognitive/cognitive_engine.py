@@ -72,6 +72,16 @@ class CognitiveEngine(BaseModule):
     def process(self, state):
 
         user_input = state.observation.content
+        clarification = self._ambiguous_constellation_clarification(user_input)
+        if clarification:
+            state.response = clarification
+            state.voice_response = clarification
+            state.speech_style = "curious"
+            Logger.info(
+                "[Cognitive] Clarified ambiguous constellation question locally"
+            )
+            return clarification
+
         identity_reply = self._identity_reply(
             user_input,
             state.self_model.identity,
@@ -244,6 +254,26 @@ class CognitiveEngine(BaseModule):
                 "website",
                 "webpage",
             )
+        )
+
+    @staticmethod
+    def _ambiguous_constellation_clarification(text):
+        normalized = "".join(
+            character for character in str(text or "").casefold()
+            if character.isalnum()
+        )
+        if "별자리" not in normalized or "오늘" not in normalized:
+            return ""
+
+        explicit_context = (
+            "운세", "점성", "밤하늘", "하늘", "관측", "보이는별", "별자리위치"
+        )
+        if any(marker in normalized for marker in explicit_context):
+            return ""
+
+        return (
+            "별자리 운세를 묻는 거야, 아니면 오늘 밤하늘에서 볼 수 있는 "
+            "별자리를 말하는 거야?"
         )
 
     @staticmethod
