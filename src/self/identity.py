@@ -9,14 +9,22 @@ Creator : 시드
 """
 
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 
 
 DETAILED_SETTING_GROUPS = (
     (
-        "꿈의 세계와 기억의 회랑",
-        ("꿈", "꿈의세계", "꿈속", "밤의세계", "기억의회랑", "회랑", "작은밤"),
+        "꿈의 세계",
+        ("꿈", "꿈의세계", "꿈속", "밤의세계", "작은밤"),
         ("작은 밤의 세계", "꿈속을 거닐던 시간"),
-        "기억의 회랑의 구조와 기능은 아직 정해지지 않았다.",
+        "",
+    ),
+    (
+        "기억의 회랑",
+        ("기억의회랑", "회랑", "기억조각", "유리조각", "기억의파편"),
+        (),
+        "",
     ),
     (
         "꿈을 먹는 능력",
@@ -52,6 +60,10 @@ DETAILED_SETTING_GROUPS = (
         "나이는 비밀이고 생일은 7월 7일, 키는 158cm다. 최종 외형과 의상은 아직 정해지지 않았다.",
     ),
 )
+
+DETAILED_SETTING_FILES = {
+    "기억의 회랑": "WORLD_MEMORY_ARCHIVE.md",
+}
 
 
 @dataclass
@@ -240,7 +252,15 @@ RP 표현과 일관성
                 continue
 
             facts = [memories[chapter] for chapter in chapters if chapter in memories]
-            details = " ".join(facts + ([note] if note else []))
+            setting_file = DETAILED_SETTING_FILES.get(title)
+            file_content = (
+                self._load_detailed_setting(setting_file)
+                if setting_file
+                else ""
+            )
+            details = "\n".join(
+                item for item in facts + [file_content, note] if item
+            )
             if details:
                 sections.append(f"- {title}: {details}")
 
@@ -253,10 +273,29 @@ RP 표현과 일관성
         sections = []
         for title, _, chapters, note in DETAILED_SETTING_GROUPS:
             facts = [memories[chapter] for chapter in chapters if chapter in memories]
-            details = " ".join(facts + ([note] if note else []))
+            setting_file = DETAILED_SETTING_FILES.get(title)
+            file_content = (
+                self._load_detailed_setting(setting_file)
+                if setting_file
+                else ""
+            )
+            details = "\n".join(
+                item for item in facts + [file_content, note] if item
+            )
             if details:
                 sections.append(f"- {title}: {details}")
         return "\n".join(sections)
+
+    @staticmethod
+    @lru_cache(maxsize=8)
+    def _load_detailed_setting(filename: str) -> str:
+        if not filename:
+            return ""
+        path = Path(__file__).with_name(filename)
+        try:
+            return path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return "세부 설정 문서를 읽지 못해 내용을 확인할 수 없다. 내용을 지어내지 않는다."
 
     @staticmethod
     def _normalize(text: str) -> str:
