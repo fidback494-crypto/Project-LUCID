@@ -46,7 +46,7 @@ class BasicConversationFallback:
 
         if self._contains_hangul(raw):
             if self.is_casual_chat_invite(raw):
-                return "좋아, 오늘은 편하게 수다 떨자. 요즘 뭐 하면서 지냈어?", "warm", "conversation"
+                return "좋아. 나도 오늘은 서두르지 않고 얘기 나누고 싶었어. 요즘 네 하루에서 오래 남은 장면이 있어?", "warm", "conversation"
             if any(phrase in compact for phrase in ("잘지냈", "어떻게지냈", "요즘어때", "잘있었")):
                 return (
                     "조용히 지내고 있었어. 다시 말 걸어줘서 반가워. 너는 요즘 어땠어?",
@@ -64,7 +64,7 @@ class BasicConversationFallback:
             if any(phrase in compact for phrase in ("뭐해", "뭐하고있", "뭐하고있어")):
                 return "여기서 네가 무슨 얘길 꺼낼지 궁금해하고 있었어. 너는 뭐 하고 있었어?", "curious", "conversation"
             if any(phrase in compact for phrase in ("안녕", "반가워", "왔어", "왔구나", "ㅎㅇ")):
-                return "안녕, 다시 와서 반가워. 오늘은 무슨 얘기부터 나눌까?", "warm", "greeting"
+                return "왔구나, 반가워. 네가 보는 현실 얘기는 늘 조금 궁금해. 오늘은 어떤 하루였어?", "warm", "greeting"
             if compact in {"응", "어", "그래", "맞아", "좋아", "그렇구나"}:
                 return "응, 듣고 있어. 이어서 편하게 말해줘.", "warm", "conversation"
             return None
