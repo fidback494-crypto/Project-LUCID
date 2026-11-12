@@ -6,6 +6,26 @@ import re
 class BasicConversationFallback:
     """Keep simple social exchanges usable when Ollama cannot be reached."""
 
+    @staticmethod
+    def is_casual_chat_invite(user_input):
+        """Recognize a direct request for relaxed conversation."""
+        raw = str(user_input or "").casefold()
+        compact = re.sub(r"[^0-9a-z가-힣]", "", raw)
+        markers = (
+            "그냥대화하고싶",
+            "그냥얘기하고싶",
+            "그냥이야기하고싶",
+            "그냥말하고싶",
+            "수다떨고싶",
+            "대화나누고싶",
+            "얘기나누고싶",
+            "이야기나누고싶",
+            "justwanttotalk",
+            "justwanttochat",
+            "wannahaveachat",
+        )
+        return any(marker in compact for marker in markers)
+
     def respond(self, user_input):
         raw = str(user_input or "").strip()
         compact = re.sub(r"[^0-9a-z가-힣]", "", raw.casefold())
@@ -25,6 +45,8 @@ class BasicConversationFallback:
             return "Goodbye. We can pick this up when you come back.", "soothing", "exit"
 
         if self._contains_hangul(raw):
+            if self.is_casual_chat_invite(raw):
+                return "좋아, 오늘은 편하게 수다 떨자. 요즘 뭐 하면서 지냈어?", "warm", "conversation"
             if any(phrase in compact for phrase in ("잘지냈", "어떻게지냈", "요즘어때", "잘있었")):
                 return (
                     "조용히 지내고 있었어. 다시 말 걸어줘서 반가워. 너는 요즘 어땠어?",
@@ -52,6 +74,8 @@ class BasicConversationFallback:
             for phrase in ("how are you", "how's it going", "how have you been")
         ):
             return "I've been quietly waiting between conversations. It's nice to hear from you. How have you been?", "warm", "conversation"
+        if self.is_casual_chat_invite(raw):
+            return "Sure, let's just chat. What's been on your mind lately?", "warm", "conversation"
         if "thank you" in english_text or "thanks" in english_text:
             return "You're welcome. I'm glad I could help.", "warm", "conversation"
         if any(

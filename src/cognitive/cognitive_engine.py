@@ -169,6 +169,18 @@ class CognitiveEngine(BaseModule):
             )
             response, _ = self._safe_fallback(user_input)
 
+        if (
+            BasicConversationFallback.is_casual_chat_invite(user_input)
+            and self._is_generic_service_or_closing_reply(response)
+        ):
+            fallback = BasicConversationFallback().respond(user_input)
+            if fallback:
+                response, speech_style, _ = fallback
+                state.speech_style = speech_style
+                Logger.info(
+                    "[Cognitive] Replaced generic closing with a conversational follow-up"
+                )
+
         state.response = response
         state.voice_response = response
 
@@ -177,6 +189,30 @@ class CognitiveEngine(BaseModule):
         )
 
         return response
+
+    @staticmethod
+    def _is_generic_service_or_closing_reply(text):
+        normalized = "".join(
+            character for character in str(text or "").casefold()
+            if character.isalnum()
+        )
+        markers = (
+            "무엇을도와드릴까요",
+            "무엇을도와줄까요",
+            "무엇을도와줄까",
+            "어떻게도와드릴까요",
+            "좋은대화되길",
+            "좋은대화나누길",
+            "오늘도좋은대화",
+            "좋은하루보내",
+            "howcan ihelp",
+            "howcan ihelpyou",
+            "whatcan ihelp",
+            "haveaniceconversation",
+        )
+        # Whitespace is removed above, so English markers are stored compactly.
+        compact_markers = tuple(marker.replace(" ", "") for marker in markers)
+        return any(marker in normalized for marker in compact_markers)
 
     def _build_messages(self, state):
         """Keep the system prompt, prior turns, and current user turn separate."""
