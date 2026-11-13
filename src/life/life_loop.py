@@ -104,6 +104,15 @@ class LifeLoop:
         # Conversation
         # =================================================
 
+        state.speech_register = self.conversation.update_speech_register(
+            state.observation.content
+        )
+        speech_register_label = {
+            "banmal": "반말",
+            "polite": "존댓말",
+            "half_polite": "반존대",
+        }.get(state.speech_register, "반말")
+        Logger.info(f"[Speech Register] {speech_register_label}")
         state.conversation = self.conversation.messages()
 
         workspace.conversation = state.conversation

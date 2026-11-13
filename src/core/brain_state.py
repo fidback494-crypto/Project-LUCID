@@ -43,6 +43,7 @@ class BrainState:
     # =====================================
 
     conversation: list = field(default_factory=list)
+    speech_register: str = "banmal"
 
     # =====================================
     # Memory
