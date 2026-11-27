@@ -226,3 +226,6 @@ data/browser_bridge_token.txt
 training/dialogue/split/
 training/dialogue/private/
 training/output/
+
+# Pycharm
+.idea
