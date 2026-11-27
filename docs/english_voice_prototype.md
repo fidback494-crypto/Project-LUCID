@@ -1,4 +1,6 @@
-# Kokoro English voice
+# Kokoro English voice prototype
+
+This is the historical setup for the retired prototype. For the current client, see [Korean speech output](korean_voice.md).
 
 LUCID can send its reply to the Kokoro voice server and play the returned WAV on
 Windows. Text chat continues if the voice server is unavailable.

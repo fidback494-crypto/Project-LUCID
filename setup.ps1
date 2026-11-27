@@ -1,19 +1,17 @@
-param(
-    [string]$PythonCommand = "python"
-)
+param([string]$PythonCommand = "python")
 
 $ErrorActionPreference = "Stop"
+$venv = Join-Path $PSScriptRoot ".venv"
+$python = Join-Path $venv "Scripts/python.exe"
+$requirements = Join-Path $PSScriptRoot "requirements.txt"
 
-& $PythonCommand --version
-
-if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    & $PythonCommand -m venv .venv
+# 프로젝트 경로와 Python 명령을 사용해 가상환경을 만들고 실행 의존성을 설치한다.
+if (-not (Test-Path $python)) {
+    & $PythonCommand -m venv $venv
+    if ($LASTEXITCODE -ne 0) { throw "Virtual environment creation failed." }
 }
+& $python -m pip install -r $requirements
+if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
 
-& ".\.venv\Scripts\python.exe" -m pip install --upgrade pip
-& ".\.venv\Scripts\python.exe" -m pip install -r requirements-portable.txt
-
-Write-Host ""
 Write-Host "LUCID setup is complete."
-Write-Host "Run: .\.venv\Scripts\Activate.ps1"
-Write-Host "Then: python main.py"
+Write-Host 'Run from the project folder: .\.venv\Scripts\python.exe main.py'

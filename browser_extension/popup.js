@@ -1,10 +1,16 @@
+import { mountClickAssist } from "./click-assist.js";
+import { drawFrame, openDesktopStream, postToBridge } from "./capture.js";
+
 const tokenInput = document.getElementById("token");
+const portInput = document.getElementById("port");
 const status = document.getElementById("status");
 
-chrome.storage.local.get(["lucidToken"], ({ lucidToken }) => {
+chrome.storage.local.get(["lucidToken", "lucidPort"], ({ lucidToken, lucidPort }) => {
+  portInput.value = lucidPort || 8765;
   tokenInput.value = lucidToken || "";
 });
 
+/** 활성 탭에서 제목·주소·선택 영역·본문 일부를 읽어 공유용 객체를 반환한다. */
 function getPageSnapshot() {
   const selection = window.getSelection ? window.getSelection().toString() : "";
 
@@ -16,46 +22,37 @@ function getPageSnapshot() {
   };
 }
 
-async function sendToLucid(token, snapshot) {
-  const response = await fetch("http://127.0.0.1:8765/context", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, ...snapshot })
-  });
-
-  if (!response.ok) {
-    throw new Error((await response.json()).error || "전송 실패");
-  }
-
-  await chrome.storage.local.set({ lucidToken: token });
+/** 공유에 성공한 연결 설정을 다음번 팝업에서도 사용한다. */
+function rememberConnection({ token, port }) {
+  return chrome.storage.local.set({ lucidToken: token, lucidPort: port });
 }
 
-function getToken() {
+/** 사용자가 입력한 로컬 포트와 토큰을 확인해 반환한다. */
+function getConnection() {
   const token = tokenInput.value.trim();
-
-  if (!token) {
-    throw new Error("LUCID 콘솔에 표시된 연결 토큰을 입력해 줘.");
+  const port = portInput.valueAsNumber;
+  if (!token) throw new Error("LUCID 콘솔에 표시된 연결 토큰을 입력해 줘.");
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("1부터 65535 사이의 포트를 입력해 줘.");
   }
-
-  return token;
+  return { token, port };
 }
 
+/** 영상 스트림에서 한 장면을 JPEG Base64로 반환하고 캡처를 종료한다. */
 async function imageFromDesktopStream(stream) {
   try {
     const video = document.createElement("video");
     video.srcObject = stream;
     await video.play();
-    const scale = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    drawFrame(video, canvas, 1600);
     return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
   } finally {
     stream.getTracks().forEach((track) => track.stop());
   }
 }
 
+/** 화면 선택 대화상자를 열고 선택한 스트림의 ID를 반환한다. */
 async function chooseDesktop() {
   const streamId = await new Promise((resolve) => {
     chrome.desktopCapture.chooseDesktopMedia(["screen", "window"], resolve);
@@ -68,23 +65,14 @@ async function chooseDesktop() {
   return streamId;
 }
 
+/** 운영체제 선택창에서 고른 화면의 첫 장면을 JPEG Base64로 반환한다. */
 async function captureDesktopOnce() {
   const streamId = await chooseDesktop();
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      mandatory: {
-        chromeMediaSource: "desktop",
-        chromeMediaSourceId: streamId,
-        maxWidth: 1920,
-        maxHeight: 1080
-      }
-    }
-  });
-
+  const stream = await openDesktopStream(streamId);
   return imageFromDesktopStream(stream);
 }
 
+/** 팝업이 닫힌 뒤에도 공유를 계속할 백그라운드 문서를 준비한다. */
 async function ensureOffscreenDocument() {
   const offscreenUrl = chrome.runtime.getURL("offscreen.html");
   const contexts = await chrome.runtime.getContexts({
@@ -105,13 +93,14 @@ async function ensureOffscreenDocument() {
 
 document.getElementById("share").addEventListener("click", async () => {
   try {
-    const token = getToken();
+    const connection = getConnection();
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const [{ result: snapshot }] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: getPageSnapshot
     });
-    await sendToLucid(token, snapshot);
+    await postToBridge(connection, "context", snapshot);
+    await rememberConnection(connection);
     status.textContent = "현재 페이지를 LUCID에 전달했어.";
   } catch (error) {
     status.textContent = `전송하지 못했어: ${error.message}`;
@@ -120,19 +109,19 @@ document.getElementById("share").addEventListener("click", async () => {
 
 document.getElementById("share-screen").addEventListener("click", async () => {
   try {
-    const token = getToken();
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const connection = getConnection();
     status.textContent = "공유할 화면 또는 창을 선택해 줘.";
     const imageBase64 = await captureDesktopOnce();
-    await sendToLucid(token, {
+    await postToBridge(connection, "context", {
       title: "사용자가 공유한 화면 또는 창",
-      url: tab.url || "",
+      url: "",
       selection: "",
       text: "",
       image_base64: imageBase64,
       image_mime: "image/jpeg",
       continuous: false
     });
+    await rememberConnection(connection);
     status.textContent = "화면 이미지를 LUCID에 전달했어.";
   } catch (error) {
     status.textContent = `전송하지 못했어: ${error.message}`;
@@ -141,22 +130,21 @@ document.getElementById("share-screen").addEventListener("click", async () => {
 
 document.getElementById("start-observing").addEventListener("click", async () => {
   try {
-    const token = getToken();
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const connection = getConnection();
     await ensureOffscreenDocument();
     status.textContent = "관찰할 화면 또는 창을 선택해 줘.";
     const streamId = await chooseDesktop();
     const response = await chrome.runtime.sendMessage({
       type: "lucid-start-observing",
       target: "offscreen",
-      options: { streamId, token, url: tab.url || "" }
+      options: { streamId, ...connection }
     });
 
     if (!response?.ok) {
       throw new Error(response?.error || "관찰을 시작하지 못했어.");
     }
 
-    await chrome.storage.local.set({ lucidToken: token });
+    await rememberConnection(connection);
     status.textContent = "루시드가 화면 변화를 곁에서 관찰 중이야.";
   } catch (error) {
     status.textContent = `관찰을 시작하지 못했어: ${error.message}`;
@@ -165,12 +153,15 @@ document.getElementById("start-observing").addEventListener("click", async () =>
 
 document.getElementById("stop-observing").addEventListener("click", async () => {
   try {
-    await chrome.runtime.sendMessage({
+    const response = await chrome.runtime.sendMessage({
       type: "lucid-stop-observing",
       target: "offscreen"
     });
+    if (!response?.ok) throw new Error(response?.error || "종료를 확인하지 못했어.");
     status.textContent = "이어지는 화면 관찰을 멈췄어.";
   } catch (error) {
     status.textContent = `관찰을 중지하지 못했어: ${error.message}`;
   }
 });
+
+mountClickAssist(getConnection, rememberConnection);

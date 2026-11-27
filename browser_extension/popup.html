@@ -7,17 +7,35 @@
       label, input, button { display: block; width: 100%; box-sizing: border-box; }
       input { margin: 6px 0 10px; }
       button { padding: 8px; }
+      [hidden] { display: none; }
+      section { margin-top: 12px; }
+      #target-image { max-width: 100%; max-height: 105px; }
+      #target-label { overflow-wrap: anywhere; }
       #status { margin-top: 10px; white-space: pre-wrap; }
     </style>
   </head>
   <body>
     <label for="token">LUCID 연결 토큰</label>
     <input id="token" type="password" placeholder="LUCID 콘솔에 표시된 토큰">
+    <label for="port">LUCID 연결 포트</label>
+    <input id="port" type="number" value="8765" min="1" max="65535" required>
     <button id="share">현재 페이지 공유</button>
     <button id="share-screen">화면 또는 창 공유</button>
     <button id="start-observing">곁에서 관찰 시작</button>
     <button id="stop-observing">관찰 중지</button>
-    <div id="status"></div>
-    <script src="popup.js"></script>
+    <div id="status" role="status"></div>
+    <section aria-label="화면에서 찾아 클릭">
+      <label for="target-request">현재 탭에서 클릭할 대상</label>
+      <input id="target-request" maxlength="500" placeholder="예: 오른쪽 위의 설정 버튼">
+      <button id="find-target">화면 한 장 보내고 대상 찾기</button>
+      <div id="target-status" role="status"></div>
+      <div id="target-preview" hidden>
+        <canvas id="target-image" aria-label="클릭할 대상 미리보기"></canvas>
+        <div id="target-label"></div>
+        <button id="click-target">이 요소 한 번 클릭</button>
+        <button id="cancel-target">취소</button>
+      </div>
+    </section>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

@@ -1,0 +1,19 @@
+# Colab 또는 CUDA 서버에서 python -m pip install --group training 또는 --group tts
+[dependency-groups]
+training = [
+    "accelerate",
+    "bitsandbytes",
+    "datasets",
+    "peft",
+    "torch",
+    "transformers==4.57.3",
+    "trl==0.26.0",
+]
+tts = [
+    "fastapi",
+    "pydantic>=2",
+    "qwen-tts==0.1.1",
+    "soundfile",
+    "torch",
+    "uvicorn",
+]

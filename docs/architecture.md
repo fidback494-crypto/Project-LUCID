@@ -4,7 +4,7 @@
 
 ## 시작
 
-1. `main.py`에서 Ollama와 한국어 음성 서버 주소를 설정한다.
+1. `main.py`의 `DEBUG`로 출력 모드를 정하고 `lucid.cli`에서 Ollama와 한국어 음성 서버 주소를 설정한다.
 2. `LucidEngine`이 LifeLoop, 기억, 도구, 브라우저·화면, 음성 기관을 만든다.
 3. `boot()`가 Kernel에 기관을 등록하고 각 `start()`를 호출한다.
 4. `CognitiveEngine.start()`가 Ollama 모델을 미리 불러온다. 이는 대화 턴의 생성 호출과 별개다.
@@ -14,7 +14,7 @@
 
 ```text
 콘솔 또는 공유 화면
-  → BrainState와 Workspace 초기화
+  → Workspace에서 이전 턴의 상태 초기화
   → 관찰, 최근 대화, 작업 기억 구성
   → 명시적 사용자 사실 저장 및 관련 기억 검색
   → 규칙 기반 도구 선택과 실행
@@ -46,10 +46,6 @@
 `DecisionEngine`은 사용자의 표현에서 도구를 고르는 규칙 기반 분기다. 이 단계는 모델이 직접 임의 코드를 호출하는 tool-calling 구조가 아니다.
 
 도구 연결은 `LucidEngine` 등록 → `DecisionEngine` 선택 → `ActionEngine`의 `ActionResult` → `BrainState.action_result` → `CognitivePrompt` 순서다. 파일 도구는 프로젝트 바깥 경로, 비밀 설정, 로컬 데이터베이스, 학습 자료를 읽지 않도록 제한한다. Python 도구는 파일·네트워크·명령 실행을 허용하지 않는다.
-
-## 아직 연결하지 않은 빈 스캐폴드
-
-현재 실행 경로에서 사용되지 않는 `attention`, `brain`, `context`, `deliberation`, `imagination`, `learning`, `metacognition`, `monologue`, `skill`, `task` 등의 구형·실험용 스캐폴드 파일은 별도 동작을 임의로 만들어 연결하지 않았다. 일부 활성 패키지 안의 빈 보조 파일(`goal_manager.py`, `workspace_item.py` 등)도 같은 상태다. 이 파일들은 `main.py`에서 import되지 않으며, 현재 동작은 `src/life`, `src/mind`, `src/cognitive`, `src/goal`, `src/workspace`의 구현 경로를 따른다. 빈 `__init__.py`는 Python 패키지 표식이므로 그대로 둔다.
 
 ## 실패 처리
 
