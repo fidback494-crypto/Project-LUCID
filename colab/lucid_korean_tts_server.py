@@ -1,4 +1,4 @@
-"""Small authenticated FastAPI service for Qwen3-TTS Korean CustomVoice."""
+"""페어링한 클라이언트의 문장을 Qwen3-TTS로 합성해 한국어 WAV를 반환한다."""
 
 import hmac
 import io
@@ -14,7 +14,6 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from qwen_tts import Qwen3TTSModel
-
 
 MODEL_ID = os.getenv(
     "LUCID_TTS_MODEL",
@@ -47,26 +46,37 @@ inference_lock = threading.Lock()
 
 
 class SpeechRequest(BaseModel):
+    """합성할 문장, 언어, 화자와 음성 스타일 지시를 검증하는 요청 본문."""
+
     text: str = Field(min_length=1, max_length=600)
     language: Literal["Korean", "Auto"] = "Korean"
     speaker: str = Field(default=SPEAKER, min_length=1, max_length=40)
     speech_style: Literal[
-        "neutral", "warm", "curious", "cheerful", "playful",
-        "soothing", "concerned", "serious", "shy",
+        "neutral",
+        "warm",
+        "curious",
+        "cheerful",
+        "playful",
+        "soothing",
+        "concerned",
+        "serious",
+        "shy",
     ] = "neutral"
     instruct: str = Field(default="", max_length=160)
 
 
 def require_token(authorization: str | None):
+    """Authorization 헤더가 서버 토큰과 일치하는지 확인하고 실패하면 401을 반환한다."""
     supplied = ""
     if authorization and authorization.lower().startswith("bearer "):
         supplied = authorization[7:].strip()
-    if not supplied or not hmac.compare_digest(supplied, API_TOKEN):
+    if not supplied or not hmac.compare_digest(supplied.encode(), API_TOKEN.encode()):
         raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
 
 
 @app.get("/api/health")
 def health():
+    """현재 모델·언어·기본 화자·인증 여부를 JSON 객체로 반환한다."""
     return {
         "status": "ok",
         "engine": "qwen3-tts",
@@ -82,16 +92,24 @@ def synthesize_audio(
     request: SpeechRequest,
     authorization: str | None = Header(default=None),
 ):
+    """인증된 문장을 지정 화자로 합성해 WAV 바이트와 처리 시간 헤더를 반환한다."""
     require_token(authorization)
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(
+            status_code=422, detail="Text cannot consist only of whitespace"
+        )
     selected_speaker = speaker_lookup.get(request.speaker.lower())
     if selected_speaker is None:
-        raise HTTPException(status_code=400, detail="Speaker is not supported by this model")
+        raise HTTPException(
+            status_code=400, detail="Speaker is not supported by this model"
+        )
 
     started = time.perf_counter()
     try:
         with inference_lock, torch.inference_mode():
             waveforms, sample_rate = model.generate_custom_voice(
-                text=request.text.strip(),
+                text=text,
                 language=request.language,
                 speaker=selected_speaker,
                 instruct=request.instruct.strip() or None,
@@ -127,7 +145,9 @@ def synthesize_audio(
         raise
     except Exception as error:
         print(f"TTS generation failed: {type(error).__name__}: {error}", flush=True)
-        raise HTTPException(status_code=500, detail="Speech generation failed") from error
+        raise HTTPException(
+            status_code=500, detail="Speech generation failed"
+        ) from error
 
 
 if __name__ == "__main__":

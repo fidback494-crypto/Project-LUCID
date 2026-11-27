@@ -49,14 +49,14 @@ python training/split_dialogue_data.py --input path/to/reviewed.jsonl --output-d
 
 The splitter writes `train.jsonl` and `validation.jsonl`. The training script
 requires at least 100 training rows and 20 validation rows unless
-`--allow-small-pilot` is explicitly set. Do not treat a pilot on the 15 seed rows
+`--allow-small-pilot` is explicitly set. Do not treat a pilot on the 17 seed rows
 as evidence that the model is ready for daily use.
 
 Run the prepared split on a Colab T4 after installing the separate training
-dependencies:
+dependencies from the project root (pip 25.1 or newer):
 
 ```bash
-pip install -r requirements-training.txt
+python -m pip install --group training
 python training/train_dialogue_lora.py \
   --train-file path/to/lucid-split/train.jsonl \
   --validation-file path/to/lucid-split/validation.jsonl
@@ -64,7 +64,7 @@ python training/train_dialogue_lora.py \
 
 ## Keep information in the right place
 
-- Stable identity and roleplay rules belong in `src/self/identity.py` and the
+- Stable identity and roleplay rules belong in `lucid/persona/identity.py` and the
   system prompt.
 - User-specific facts and real past interactions belong in SQLite memory.
 - This dataset should teach response habits, not make the model believe that a

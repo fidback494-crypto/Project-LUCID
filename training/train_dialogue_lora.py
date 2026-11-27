@@ -1,16 +1,24 @@
-"""QLoRA supervised fine-tuning for LUCID's reviewed Korean dialogue corpus."""
+"""검수한 한국어 대화로 Qwen 모델의 LoRA 어댑터를 학습한다."""
 
 import argparse
 from pathlib import Path
 
+if __package__:
+    from .corpus import validate_row
+else:
+    from corpus import validate_row
 
-def parse_args():
+
+def parse_args() -> argparse.Namespace:
+    """학습 파일 경로·모델·길이 등의 CLI 옵션을 반환한다."""
     parser = argparse.ArgumentParser(
         description="Fine-tune the matching Qwen Instruct base with a LoRA adapter."
     )
     parser.add_argument("--train-file", required=True, type=Path)
     parser.add_argument("--validation-file", required=True, type=Path)
-    parser.add_argument("--output-dir", default=Path("/content/lucid-qwen-lora"), type=Path)
+    parser.add_argument(
+        "--output-dir", default=Path("/content/lucid-qwen-lora"), type=Path
+    )
     parser.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")
     parser.add_argument("--epochs", default=3, type=int)
     parser.add_argument("--max-length", default=2048, type=int)
@@ -18,7 +26,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
+    """데이터와 GPU를 검사하고 지정한 출력 폴더에 어댑터와 토크나이저를 저장한다."""
     args = parse_args()
 
     import torch
@@ -31,6 +40,9 @@ def main():
         raise RuntimeError("QLoRA 실행에 GPU가 필요해. Colab에서 T4 런타임을 선택해줘.")
     if not args.train_file.is_file() or not args.validation_file.is_file():
         raise FileNotFoundError("학습용과 검증용 JSONL 파일 경로를 확인해줘.")
+
+    if args.train_file.samefile(args.validation_file):
+        raise ValueError("학습과 검증에는 서로 다른 파일이 필요해.")
 
     datasets = load_dataset(
         "json",
@@ -47,19 +59,14 @@ def main():
             "최종 학습 전에는 검수한 다중 턴 대화를 더 모아줘."
         )
         if not args.allow_small_pilot:
-            raise ValueError(message + " 작은 형식 확인만 하려면 --allow-small-pilot을 사용해.")
+            raise ValueError(
+                message + " 작은 형식 확인만 하려면 --allow-small-pilot을 사용해."
+            )
         print("주의:", message)
 
     for split_name in ("train", "validation"):
         for row_number, row in enumerate(datasets[split_name], start=1):
-            if not isinstance(row.get("prompt"), list) or not isinstance(row.get("completion"), list):
-                raise ValueError(f"{split_name} {row_number}번째 행은 prompt/completion 메시지 배열이 필요해.")
-            if not row["prompt"] or not row["completion"]:
-                raise ValueError(f"{split_name} {row_number}번째 행에 빈 prompt/completion이 있어.")
-            if row["prompt"][-1].get("role") != "user":
-                raise ValueError(f"{split_name} {row_number}번째 prompt는 user 메시지로 끝나야 해.")
-            if any(message.get("role") != "assistant" for message in row["completion"]):
-                raise ValueError(f"{split_name} {row_number}번째 completion은 assistant 메시지만 포함해야 해.")
+            validate_row(row, split_name, row_number)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
@@ -86,8 +93,13 @@ def main():
         bias="none",
         task_type="CAUSAL_LM",
         target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
         ],
     )
     training = SFTConfig(

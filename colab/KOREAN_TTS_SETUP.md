@@ -5,11 +5,11 @@
 ## Colab에서 순서대로 실행
 
 1. Ollama를 실행 중인 Colab 노트북을 쓰거나 새 Colab 노트북을 열고 **런타임 → 런타임 유형 변경 → T4 GPU**를 선택한다.
-2. `colab/lucid_korean_tts_server.py` 파일을 Colab의 `/content` 폴더에 업로드한다.
-3. 새 코드 셀에서 다음을 한 줄씩 실행한다.
+2. `colab/lucid_korean_tts_server.py`와 프로젝트 루트의 `pyproject.toml`을 Colab의 `/content` 폴더에 업로드한다.
+3. 새 코드 셀에서 다음을 실행한다. 의존성 그룹 설치에는 pip 25.1 이상이 필요하다.
 
 ```python
-%pip install "qwen-tts==0.1.1" "transformers==4.57.3" fastapi uvicorn soundfile
+%pip install --group /content/pyproject.toml:tts
 ```
 
 설치가 끝난 뒤 Python 런타임을 재시작하라는 안내가 나오면 재시작하고, 필요한 경우 설치 셀을 다시 실행한다.

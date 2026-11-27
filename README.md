@@ -22,7 +22,7 @@ cd Project-LUCID
 
 ```powershell
 ollama pull qwen2.5:3b
-python main.py
+.\.venv\Scripts\python.exe main.py
 ```
 
 원격 Ollama 또는 Cloudflare Tunnel을 사용할 때:
@@ -30,8 +30,22 @@ python main.py
 ```powershell
 $env:LUCID_OLLAMA_URL="https://your-server.example"
 $env:LUCID_OLLAMA_MODEL="qwen2.5:3b"
-python main.py
+.\.venv\Scripts\python.exe main.py
 ```
+
+### macOS와 Linux
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python main.py
+```
+
+`main.py`의 `DEBUG = False`는 답변, 연결 토큰, 명령 결과와 필요한 안내를 표시합니다. `True`로 바꾸면 모듈 시작·종료, 도구 선택, 모델 요청 시간 등 진단 로그도 표시합니다. 같은 환경에서 `python -m lucid`로 실행해도 이 설정을 사용합니다.
+
+동작하는 코드의 위치는 [모듈 경로표](docs/module-paths.md)에서 확인할 수 있습니다. 로컬 앱에 필요한 Python 패키지는 루트 `requirements.txt`로 설치합니다. CUDA 서버에서는 pip 25.1 이상으로 `python -m pip install --group training`(학습) 또는 `python -m pip install --group tts`(음성 합성)를 실행합니다. 두 그룹은 `pyproject.toml`에 정의되어 있습니다. 이전 Windows 패키지 목록과 구형 폴더 이동 스크립트의 원문은 `tools/legacy/`에 보관합니다.
+
+저장소 루트에서 `python -m unittest discover`로 로그, 추론, 작업 상태, 학습 데이터 분할을 검사할 수 있습니다.
 
 선택 환경 변수:
 
@@ -79,7 +93,7 @@ LUCID/Ollama 프로세스와 별도 T4 런타임에서 실행하는 구성을 �
 ## 대화 습관 학습 데이터
 
 대화 습관은 `training/dialogue/seed.jsonl`의 예시를 검토·확장한 뒤 LoRA SFT로
-학습하도록 준비했습니다. 예시 15개는 형식과 방향을 보여주는 시작 자료일 뿐,
+학습하도록 준비했습니다. 예시 17개는 형식과 방향을 보여주는 시작 자료일 뿐,
 실제 학습에 충분한 데이터가 아닙니다. 개인정보나 미검토 대화 로그를 그대로 넣지
 말고, 여러 턴의 자연스러운 대화를 직접 검수해 별도 train/validation JSONL로
 나눈 다음 `training/train_dialogue_lora.py`를 실행하세요. 장기 기억과 사용자별
@@ -116,12 +130,11 @@ python training/train_dialogue_lora.py --train-file path/to/lucid-split/train.js
 사용자와 LUCID가 주고받은 각 대화도 `conversation_episodes`에 시각과 함께
 저장합니다. LUCID는 현재 입력과 단어가 겹치는 과거 대화를 최대 3건 검색해
 인지 프롬프트에 참고 자료로 전달합니다. 검색 기간은 최소 5년이며 자동 삭제하지
-않습니다. 이 기록은 `data/lucid_memory.db` 안에만 저장되고 Git에는 포함되지
-않습니다. 과거 대화 로그가 이 DB에 없으면 앱을 실행한 이후의 대화부터 쌓입니다.
+않습니다. 기록의 로컬 저장 위치는 `data/lucid_memory.db`입니다. 대화에 참고하는 기억과 과거 대화 일부는 설정한 Ollama 서버에 함께 전송됩니다. DB 파일은 Git에서 제외합니다. 과거 대화 로그가 이 DB에 없으면 앱을 실행한 이후의 대화부터 쌓입니다.
 
 캐릭터 설정은 세 단계로 나눕니다. 핵심 정체성과 기본 성격은 매 인지 주기에 짧게
-전달하고, 꿈의 세계·능력·과거·외형 등 상세 설정은 `src/self/identity.py`,
-`src/self/WORLD_MEMORY_ARCHIVE.md`, `src/self/CHARACTER_FINAL_APPEARANCE.md`에서 현재
+전달하고, 꿈의 세계·능력·과거·외형 등 상세 설정은 `lucid/persona/identity.py`,
+`lucid/persona/WORLD_MEMORY_ARCHIVE.md`, `lucid/persona/CHARACTER_FINAL_APPEARANCE.md`에서 현재
 질문과 관련된 항목만 검색해 전달합니다. 사용자와의 대화·명시적 사실은 SQLite에
 별도 저장해 관련 있을 때 참고하며, 공식 캐릭터 설정과 섞지 않습니다. 미정인 설정이나
 확인되지 않은 약속·추억은 사실로 만들지 않습니다.
@@ -170,6 +183,10 @@ LUCID는 사용자가 명시적으로 공유한 현재 브라우저 탭의 내�
 /page 이 글의 핵심은 뭐야?     페이지를 바탕으로 질문하기
 /page-think                   페이지를 보고 LUCID의 짧은 혼잣말 듣기
 ```
+
+## 화면에서 찾아 클릭하기
+
+확장 팝업에서 현재 탭에 보이는 버튼이나 링크를 설명하면 비전 모델이 후보를 고릅니다. 표시된 대상을 확인하고 클릭을 승인하면 현재 탭에서 한 번 실행합니다. 대상이나 탭이 바뀌면 다시 찾아야 합니다. [클릭 기능과 사용 조건](browser_extension/README.md)
 
 ## 화면·창을 비전 모델로 보기
 

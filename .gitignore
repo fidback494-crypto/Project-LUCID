@@ -220,9 +220,12 @@ __marimo__/
 # Project-LUCID local data
 lucid_memory.db
 data/*.db
-data/browser_bridge_token.txt
+browser_bridge_token.txt
 
 # Local reviewed dialogue corpus splits and fine-tuning artifacts
 training/dialogue/split/
 training/dialogue/private/
 training/output/
+
+# Pycharm
+.idea

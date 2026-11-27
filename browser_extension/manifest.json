@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "LUCID Page Share",
-  "version": "0.1.0",
-  "description": "Share the active page with a local LUCID instance only when requested.",
+  "name": "LUCID 페이지 공유와 클릭",
+  "version": "0.2.0",
+  "description": "현재 탭의 페이지·화면을 LUCID와 공유하고 화면에서 찾은 요소를 확인해 클릭합니다.",
   "permissions": ["activeTab", "scripting", "storage", "desktopCapture", "offscreen"],
-  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "host_permissions": ["http://127.0.0.1/*"],
   "action": {
-    "default_title": "Share this page with LUCID",
+    "default_title": "LUCID와 공유하거나 클릭할 대상 찾기",
     "default_popup": "popup.html"
   }
 }

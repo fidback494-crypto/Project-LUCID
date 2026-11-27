@@ -1,42 +1,24 @@
-from src.mind.observation_engine import ObservationEngine
-from src.memory.working_memory import WorkingMemory
-from src.mind.thought_engine import ThoughtEngine
-from src.mind.decision_engine import DecisionEngine
+"""서버 없이 관찰, 작업 기억, 도구 선택, 계산까지 한 턴을 실행한다."""
 
-observation = ObservationEngine()
-memory = WorkingMemory()
-thought = ThoughtEngine()
-decision = DecisionEngine()
+from lucid.actions.tools.calculator import CalculatorTool
+from lucid.core.state import BrainState
+from lucid.memory.working import WorkingMemory
+from lucid.mind.decisions import DecisionEngine
+from lucid.mind.observation import ObservationEngine
 
-observation.start()
-memory.start()
-thought.start()
-decision.start()
 
-# 1. 관찰
-obs = observation.observe(
-    "user",
-    "시드가 안녕이라고 말했다."
-)
+def main() -> None:
+    """예시 수식의 관찰과 도구 선택, 실제 계산 결과를 콘솔에 출력한다."""
+    observation = ObservationEngine().process("2+3")
+    memory = WorkingMemory()
+    memory.add(observation)
+    state = BrainState(observation=observation, working_memory=memory.recent())
+    action = DecisionEngine().process(state).action_object
+    print(f"관찰: {observation.content}")
+    print(f"도구: {action.tool}")
+    if action.tool == "calculator":
+        print(f"결과: {CalculatorTool().execute(action.command).output}")
 
-# 2. 단기 기억
-memory.add(obs)
 
-# 3. 생각 생성
-t = thought.create(
-    "사용자에게 인사해야 한다."
-)
-
-# 4. 판단
-d = decision.decide(t)
-
-print()
-print("===== Pipeline =====")
-print(obs)
-print(t)
-print(d)
-
-decision.stop()
-thought.stop()
-memory.stop()
-observation.stop()
+if __name__ == "__main__":
+    main()
