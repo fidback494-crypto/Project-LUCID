@@ -74,7 +74,7 @@ python training/train_dialogue_lora.py \
 ## Fine-tuning
 
 Use supervised fine-tuning with a LoRA/QLoRA adapter based on
-`Qwen/Qwen2.5-3B-Instruct`, matching the `qwen2.5:3b` inference family. Keep the
+`Qwen/Qwen2.5-3B-Instruct`. This experiment produces a Qwen adapter. The default multimodal runtime uses Gemma 3 and requires a matching Gemma adapter for fine-tuning. Keep the
 base model and adapter matched. Do not train the full model for the first pass.
 After the data is curated, use a Colab T4 run as a small pilot and save the
 adapter outside the project data folder. Compare it with the untuned model on

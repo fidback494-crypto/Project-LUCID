@@ -1,19 +1,26 @@
 """초기 LUCID에서 사용한 lucid.db 형식의 저장 API."""
 
-import os
-import sqlite3
 from pathlib import Path
+
+from lucid.memory.import_legacy import legacy_view, prepare_legacy
 
 DB_PATH = Path("data")
 DATABASE = DB_PATH / "lucid.db"
 
 
 def get_connection():
-    """환경 변수 또는 기존 상대 경로에 있는 lucid.db를 열고 연결을 반환한다."""
-    directory = os.getenv("LUCID_DATA_DIR")
-    path = Path(directory) / DATABASE.name if directory else DATABASE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(path)
+    """현재 DB에 구형 테이블 이름·행 레이아웃을 제공하는 로컬 연결을 연다."""
+    from lucid.memory.store import LongTermMemory
+
+    store = LongTermMemory()
+    db = store.db
+    try:
+        db.row_factory = None
+        legacy_view(db)
+    except Exception:
+        db.close()
+        raise
+    return db
 
 
 class MemoryEngine:
@@ -27,13 +34,7 @@ class MemoryEngine:
     def create_table(self):
         """기존 행을 유지하면서 필요한 기억 테이블을 만든다."""
         with self.conn:
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS memories(
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    memory_type TEXT, content TEXT, importance REAL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+            prepare_legacy(self.conn)
 
     def add_memory(self, memory_type, content, importance=0.5):
         """종류·내용·중요도를 받아 새 기억 한 건을 저장한다."""

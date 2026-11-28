@@ -5,7 +5,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
-MODEL_NAME = "qwen2.5:3b"
+MODEL_NAME = "gemma3:12b"
+DEFAULT_WARMUP_TIMEOUT = 180
+DEFAULT_KEEP_ALIVE = "10m"
 
 
 # 구형 클라이언트에서 직접 가져다 쓰던 기본 프롬프트. 현재 대화의 지침은 persona에서 구성한다.

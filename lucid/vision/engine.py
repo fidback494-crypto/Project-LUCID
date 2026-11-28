@@ -1,39 +1,15 @@
 """공유한 화면을 Ollama 비전 모델에 전달하고 관찰 결과를 받는다."""
 
 import json
-import os
 
 import requests
 
+from lucid.language.ollama import OllamaClient
 from lucid.log import Logger
-from lucid.settings import DEFAULT_OLLAMA_URL
 
 
-class VisionClient:
-    """이미지와 질문을 Ollama 채팅 API에 보내 한 장면을 분석한다."""
-
-    def __init__(self):
-        """서버 주소·모델·제한 시간을 읽고 HTTP 세션을 준비한다."""
-        self.base_url = (
-            os.getenv(
-                "LUCID_VISION_URL",
-                os.getenv("LUCID_OLLAMA_URL", DEFAULT_OLLAMA_URL),
-            )
-            .strip()
-            .rstrip("/")
-        )
-        self.model = os.getenv("LUCID_VISION_MODEL", "gemma3:12b")
-        try:
-            self.timeout = max(
-                5, min(int(os.getenv("LUCID_VISION_TIMEOUT", "300")), 3600)
-            )
-        except ValueError:
-            self.timeout = 300
-        self.session = requests.Session()
-
-    def close(self):
-        """화면 분석에 사용한 HTTP 세션을 닫는다."""
-        self.session.close()
+class VisionClient(OllamaClient):
+    """대화와 동일한 모델·서버에 화면과 질문을 보내 관찰하거나 클릭 후보를 고른다."""
 
     def observe(self, image_base64, question, previous_observation=""):
         """Base64 이미지·질문·직전 요약으로 관찰 문장을 만든다. 실패하면 빈 문자열을 반환한다."""
@@ -46,8 +22,6 @@ class VisionClient:
             else "첫 장면이야. 현재 화면에 실제로 보이는 내용만 짧게 요약해."
         )
         payload = {
-            "model": self.model,
-            "stream": False,
             "messages": [
                 {
                     "role": "system",
@@ -66,7 +40,6 @@ class VisionClient:
                 },
             ],
             "options": {
-                "num_ctx": 4096,
                 "num_predict": 160,
                 "temperature": 0.2,
             },
@@ -92,12 +65,8 @@ class VisionClient:
 
     def _chat(self, payload):
         """Ollama에 요청을 전송해 응답 본문을 반환한다. 통신·응답 형식 오류는 호출자에게 전달한다."""
-        response = self.session.post(
-            f"{self.base_url}/api/chat", json=payload, timeout=(5, self.timeout)
-        )
-        response.raise_for_status()
-        data = response.json()
-        message = data.get("message") if isinstance(data, dict) else None
+        data = self._post(self.api_url, payload, (5, self.timeout), "vision")
+        message = data.get("message")
         content = message.get("content") if isinstance(message, dict) else None
         if not isinstance(content, str):
             raise ValueError("비전 모델의 응답 형식을 확인해 줘.")
@@ -106,8 +75,6 @@ class VisionClient:
     def select_click_target(self, image, instruction, candidates):
         """번호를 표시한 화면·사용자 요청·후보 목록에서 일치하는 번호 하나를 반환한다. 없으면 0."""
         payload = {
-            "model": self.model,
-            "stream": False,
             "format": {
                 "type": "object",
                 "properties": {"target": {"type": "integer"}},
@@ -131,7 +98,7 @@ class VisionClient:
                     "images": [image],
                 },
             ],
-            "options": {"temperature": 0, "num_predict": 40, "num_ctx": 4096},
+            "options": {"temperature": 0, "num_predict": 40},
         }
         result = json.loads(self._chat(payload))
         target = result.get("target") if isinstance(result, dict) else None

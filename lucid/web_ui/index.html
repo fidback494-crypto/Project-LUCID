@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f7f3">
+  <title>LUCID · 대화</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#message">메시지 입력으로 이동</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="대화 도구">
+      <div class="brand-row">
+        <a class="brand" href="#conversation" aria-label="LUCID 대화로 이동">
+          <span class="orbit" aria-hidden="true"></span><span>LUCID</span>
+        </a>
+        <button class="menu-toggle" id="menu-toggle" type="button" aria-controls="sidebar-tools" aria-expanded="false">대화 도구</button>
+      </div>
+      <div id="sidebar-tools" class="sidebar-tools">
+        <section class="commands" aria-labelledby="commands-title">
+          <h2 id="commands-title">빠른 명령</h2>
+          <button class="command" data-command="/tools" type="button" disabled><span>등록된 도구</span><code>/tools</code></button>
+          <button class="command" data-command="/status" type="button" disabled><span>현재 상태</span><code>/status</code></button>
+          <button class="command" data-command="/memory sessions" type="button" disabled><span>대화 기억</span><code>/memory sessions</code></button>
+        </section>
+        <details id="activity" class="activity">
+          <summary>작동 기록</summary>
+          <div class="log-scroll" tabindex="0" role="region" aria-label="엔진 작동 기록">
+            <p id="empty-log">아직 기록이 없습니다.</p>
+            <ul id="logs"></ul>
+          </div>
+        </details>
+      </div>
+    </aside>
+    <main class="conversation" id="conversation">
+      <header class="thread-header">
+        <h1>대화</h1>
+        <div class="engine"><code id="model" hidden></code><span id="status" role="status">연결 중</span></div>
+      </header>
+      <div class="thread-scroll" id="thread-scroll" tabindex="0" role="region" aria-label="대화 내용">
+        <div class="empty" id="welcome">
+          <div class="empty-mark" aria-hidden="true"><i></i><b></b></div>
+          <p>무슨 이야기를 나눌까요?</p>
+        </div>
+        <div id="timeline" class="timeline" role="log" aria-label="메시지 기록" aria-live="polite" aria-relevant="additions text"></div>
+      </div>
+      <div class="compose-area">
+        <p class="feedback" id="feedback" role="status" hidden></p>
+        <form id="composer">
+          <label for="message" class="sr-only">메시지</label>
+          <textarea id="message" name="message" rows="2" maxlength="8000" placeholder="메시지를 입력하세요…" autocomplete="off"></textarea>
+          <button type="submit" id="send" disabled>전송<span class="send-icon" aria-hidden="true"></span></button>
+        </form>
+        <div class="keyboard-hint"><kbd>Enter</kbd> 전송 <span>·</span> <kbd>Shift + Enter</kbd> 줄바꿈</div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
