@@ -21,7 +21,7 @@ cd Project-LUCID
 같은 컴퓨터에서 Ollama를 사용할 때:
 
 ```powershell
-ollama pull qwen2.5:3b
+ollama pull gemma3:12b
 .\.venv\Scripts\python.exe main.py
 ```
 
@@ -29,7 +29,7 @@ ollama pull qwen2.5:3b
 
 ```powershell
 $env:LUCID_OLLAMA_URL="https://your-server.example"
-$env:LUCID_OLLAMA_MODEL="qwen2.5:3b"
+$env:LUCID_OLLAMA_MODEL="gemma3:12b"
 .\.venv\Scripts\python.exe main.py
 ```
 
@@ -41,18 +41,35 @@ python3 -m venv .venv
 .venv/bin/python main.py
 ```
 
+### 브라우저에서 대화하기
+
+```bash
+python main.py WEB=True
+```
+
+기본 브라우저에서 `http://127.0.0.1:8787/`이 열립니다. 일반 대화와 `/tools`, `/status`, `/memory` 등 기존 명령을 사용할 수 있습니다. 같은 서버를 연 탭들은 한 세션을 공유합니다. 새로고침하면 최근 출력 기록을 다시 볼 수 있습니다. 웹 화면은 현재 컴퓨터에서만 접속할 수 있고, 브라우저 확장 없이 사용할 수 있습니다.
+
+다른 포트에서 사용하려면 `python main.py WEB=True --port 8788`을 실행하세요. `--no-browser`를 붙이면 주소만 표시합니다. 모델과 음성 서버 주소는 실행 전 환경 변수로 지정합니다. 탭을 닫아도 서버는 계속 실행됩니다. 대화에 `exit`를 입력하면 엔진이 종료되고, 터미널에서 `Ctrl+C`를 누르면 웹 서버도 닫힙니다.
+
+항상 웹 화면으로 열려면 `main.py`에서 `WEB = True`를 설정합니다. 기본 포트는 같은 파일의 `WEB_PORT`에서 바꿀 수 있습니다. `python -m lucid WEB=True`로도 실행할 수 있습니다.
+
+### 데스크톱 창으로 대화하기
+
+`python main.py GUI=True`를 실행하면 이번에만 데스크톱 창을 엽니다. 항상 창으로 시작하려면 `main.py`의 `GUI = True`를 저장합니다. 창에서 Ollama 서버 설정, 대화 입력, `/status`와 `/memory` 같은 명령을 사용할 수 있습니다. 기본값 `GUI = False`는 터미널을 엽니다. 창은 Python의 Tkinter를 사용합니다. 현재 가상환경의 Python으로 `python -m tkinter`를 실행하면 Tk 설치를 확인할 수 있습니다. Homebrew Python에는 같은 버전의 `python-tk` 패키지가 필요합니다.
+
 `main.py`의 `DEBUG = False`는 답변, 연결 토큰, 명령 결과와 필요한 안내를 표시합니다. `True`로 바꾸면 모듈 시작·종료, 도구 선택, 모델 요청 시간 등 진단 로그도 표시합니다. 같은 환경에서 `python -m lucid`로 실행해도 이 설정을 사용합니다.
 
 동작하는 코드의 위치는 [모듈 경로표](docs/module-paths.md)에서 확인할 수 있습니다. 로컬 앱에 필요한 Python 패키지는 루트 `requirements.txt`로 설치합니다. CUDA 서버에서는 pip 25.1 이상으로 `python -m pip install --group training`(학습) 또는 `python -m pip install --group tts`(음성 합성)를 실행합니다. 두 그룹은 `pyproject.toml`에 정의되어 있습니다. 이전 Windows 패키지 목록과 구형 폴더 이동 스크립트의 원문은 `tools/legacy/`에 보관합니다.
 
-저장소 루트에서 `python -m unittest discover`로 로그, 추론, 작업 상태, 학습 데이터 분할을 검사할 수 있습니다.
+저장소 루트에서 `python -m unittest discover`로 공통 모델 요청, 창의 명령 처리, 기억 압축·복원과 기존 런타임을 검사할 수 있습니다.
 
 선택 환경 변수:
 
 ```text
 LUCID_OLLAMA_URL       Ollama 서버 주소 (기본값: http://127.0.0.1:11434)
-LUCID_OLLAMA_MODEL     사용할 모델 (기본값: qwen2.5:3b)
-LUCID_OLLAMA_TIMEOUT   요청 제한 시간(초, 기본값: 300)
+LUCID_OLLAMA_MODEL     대화·화면에 공통으로 사용할 이미지 지원 모델 (기본값: gemma3:12b)
+LUCID_OLLAMA_TIMEOUT   일반 요청 제한 시간(초, 기본값: 300)
+LUCID_OLLAMA_WARMUP_TIMEOUT  시작 시 모델 예열 제한 시간(초, 기본값: 180)
 LUCID_OLLAMA_KEEP_ALIVE 모델 메모리 유지 시간 (기본값: 10m)
 LUCID_DATA_DIR         로컬 기억 데이터 폴더 (기본값: 프로젝트/data)
 LUCID_TTS_URL          한국어 Qwen3-TTS 서버 주소
@@ -62,10 +79,10 @@ LUCID_TTS_SPEAKER      음성 화자 (기본값: Sohee)
 
 ## 응답 속도
 
-텍스트 모델은 시작할 때 미리 불러오고 기본 10분 동안 메모리에 유지합니다. 유지 시간을
-바꾸려면 실행 전에 설정하세요.
+앱을 시작하면 대화와 화면 인식에 사용할 모델을 한 번 예열합니다. 기본 예열 대기 시간은 180초이고 요청 후 모델을 메모리에 유지하는 시간은 10분입니다. 서버 속도에 맞춰 두 값을 독립적으로 설정할 수 있습니다.
 
 ```powershell
+$env:LUCID_OLLAMA_WARMUP_TIMEOUT="240"
 $env:LUCID_OLLAMA_KEEP_ALIVE="30m"
 ```
 
@@ -104,9 +121,7 @@ python training/split_dialogue_data.py --input path/to/reviewed.jsonl --output-d
 python training/train_dialogue_lora.py --train-file path/to/lucid-split/train.jsonl --validation-file path/to/lucid-split/validation.jsonl
 ```
 
-학습 결과는 현재 Ollama 모델에 바로 붙일 수 있다고 가정하지 마세요. 같은 기반
-체크포인트인지 확인하고, Ollama가 해당 Qwen 어댑터 형식을 지원하는지 확인한 뒤
-병합·변환 또는 별도 추론 서버 방식으로 검증해야 합니다.
+이 학습 스크립트는 Qwen용 어댑터를 생성합니다. 기본 대화·화면 모델인 Gemma 3를 학습하려면 Gemma에 맞는 기반 체크포인트와 학습 구성이 필요합니다.
 
 ## 데이터 이전
 
@@ -127,10 +142,9 @@ python training/train_dialogue_lora.py --train-file path/to/lucid-split/train.js
 표시해 이력에 남깁니다. 현재 추출기는 명시적인 이름과 좋아하거나 싫어하는 대상을
 저장합니다.
 
-사용자와 LUCID가 주고받은 각 대화도 `conversation_episodes`에 시각과 함께
-저장합니다. LUCID는 현재 입력과 단어가 겹치는 과거 대화를 최대 3건 검색해
-인지 프롬프트에 참고 자료로 전달합니다. 검색 기간은 최소 5년이며 자동 삭제하지
-않습니다. 기록의 로컬 저장 위치는 `data/lucid_memory.db`입니다. 대화에 참고하는 기억과 과거 대화 일부는 설정한 Ollama 서버에 함께 전송됩니다. DB 파일은 Git에서 제외합니다. 과거 대화 로그가 이 DB에 없으면 앱을 실행한 이후의 대화부터 쌓입니다.
+각 대화의 원문은 `data/lucid_memory.db`에 기록됩니다. 7일이 지난 대화는 30분 넘는 공백을 기준으로 나누고 최대 50턴씩 묶습니다. 하나의 DB에 짧은 세션 요약과 무손실 압축 원문을 함께 보관합니다. 다음 대화에서는 최근 원문과 최대 두 개의 세션 요약을 참고합니다. 관련 있는 요약이 부족하면 최근 요약으로 채웁니다. 설정한 Ollama 서버에는 이 참고 자료가 함께 전달됩니다.
+
+기존 `lucid.db`가 있으면 앱이 읽을 수 있는 구형 기억 행을 현재 DB에 이관합니다. 기존 파일은 복구용으로 보존하고, 이후 기록은 `lucid_memory.db`에 저장합니다.
 
 캐릭터 설정은 세 단계로 나눕니다. 핵심 정체성과 기본 성격은 매 인지 주기에 짧게
 전달하고, 꿈의 세계·능력·과거·외형 등 상세 설정은 `lucid/persona/identity.py`,
@@ -142,7 +156,7 @@ python training/train_dialogue_lora.py --train-file path/to/lucid-split/train.js
 말하고, 긴 공백에는 부담을 주지 않으면서 반가움을 더 분명히 표현합니다. 정확한
 대화 로그가 없을 때는 내적 경험 기록을 근삿값으로 사용하고 날짜를 확정하지 않습니다.
 
-실행 중 콘솔에서 기억을 관리할 수 있습니다.
+데스크톱 창과 콘솔에서 같은 명령으로 기억을 관리할 수 있습니다.
 
 ```text
 /memory                         활성 장기 기억 보기
@@ -151,6 +165,8 @@ python training/train_dialogue_lora.py --train-file path/to/lucid-split/train.js
 /memory search <질문>           관련 기억 검색
 /memory history                이전 값과 삭제된 기억을 포함한 이력 보기
 /memory episodes               최근 저장된 대화 기억 보기
+/memory sessions [검색어]         압축된 과거 대화 요약과 세션 번호 보기
+/memory session <번호>           해당 세션의 대화 원문 보기
 /memory delete <번호>          활성 기억을 목록에서 삭제
 ```
 
@@ -190,11 +206,7 @@ LUCID는 사용자가 명시적으로 공유한 현재 브라우저 탭의 내�
 
 ## 화면·창을 비전 모델로 보기
 
-화면 캡처를 이해하려면 Ollama 서버에 비전 모델을 한 번 설치해야 합니다.
-
-```bash
-ollama pull gemma3:12b
-```
+화면 캡처와 클릭 대상 선택은 대화에 사용하는 Ollama 모델을 공유합니다. 서버에 공통 모델을 한 번 설치하면 됩니다.
 
 LUCID를 다시 시작한 뒤 브라우저 확장의 **화면 또는 창 공유**를 누르면
 한 장면을 분석합니다. 이어서 곁에서 보게 하려면 **곁에서 관찰 시작**을 누르고,
@@ -207,13 +219,7 @@ LUCID를 다시 시작한 뒤 브라우저 확장의 **화면 또는 창 공유*
 /screen-think                        화면을 본 LUCID의 짧은 혼잣말 듣기
 ```
 
-비전 모델은 기본으로 `gemma3:12b`를 사용합니다. 다른 Ollama 서버나 모델을
-사용하려면 실행 전에 아래 환경 변수를 설정할 수 있습니다.
-
-```powershell
-$env:LUCID_VISION_URL="https://your-ollama-server.example"
-$env:LUCID_VISION_MODEL="gemma3:12b"
-```
+공통 모델을 바꿀 때는 이미지 입력을 지원하는 모델을 `LUCID_OLLAMA_MODEL`에 지정합니다. 이전에 `LUCID_VISION_URL` 또는 `LUCID_VISION_MODEL`만 설정했다면 원하는 값을 `LUCID_OLLAMA_URL`, `LUCID_OLLAMA_MODEL`로 옮기세요. 설정한 서버는 대화와 화면을 모두 받습니다.
 
 ### 곁에서 이어서 화면 보기
 

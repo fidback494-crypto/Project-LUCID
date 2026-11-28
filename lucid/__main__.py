@@ -1,4 +1,4 @@
-"""python -m lucid에서도 프로젝트 실행기의 DEBUG 설정을 사용한다."""
+"""python -m lucid에서도 프로젝트 실행기의 화면과 DEBUG 설정을 사용한다."""
 
 from pathlib import Path
 from runpy import run_path

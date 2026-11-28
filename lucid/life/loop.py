@@ -102,7 +102,11 @@ class LifeLoop:
                 transcript,
                 limit=3,
                 years=self.long_memory.MIN_CONVERSATION_MEMORY_YEARS,
+                include_archived=False,
             )
+        )
+        state.session_summaries = self.long_memory.session_summaries(
+            transcript, limit=2
         )
         state.last_conversation_gap = self.long_memory.last_conversation_gap()
 

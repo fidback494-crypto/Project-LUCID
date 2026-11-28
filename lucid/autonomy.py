@@ -150,7 +150,6 @@ class AutonomousEngine(BaseModule):
             reply = self.client.generate(
                 [{"role": "system", "content": prompt}],
                 options={
-                    "num_ctx": 2048,
                     "num_predict": 240,
                     "temperature": 0.65,
                 },

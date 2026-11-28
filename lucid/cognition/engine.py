@@ -85,7 +85,7 @@ class CognitiveEngine(OllamaModule):
         started_at = monotonic()
         reply = self.client.generate(
             self._build_messages(state),
-            options={"num_ctx": 4096, "num_predict": 192, "temperature": 0.4},
+            options={"num_predict": 192, "temperature": 0.4},
             response_format=self.RESPONSE_SCHEMA,
         )
         elapsed = monotonic() - started_at
@@ -225,12 +225,21 @@ class CognitiveEngine(OllamaModule):
                 }
             )
 
-        messages.append(
+        # 과거 기록은 현재 사용자의 요청보다 앞에 참고 자료로 제공한다.
+        summaries = [
             {
-                "role": "user",
-                "content": str(state.observation.content).strip(),
+                "시작": session["started_at"],
+                "종료": session["ended_at"],
+                "턴": session["turn_count"],
+                "요약": self._limit_text(session["summary"], 700),
             }
-        )
+            for session in state.session_summaries[:2]
+        ]
+        user_message = str(state.observation.content).strip()
+        if summaries:
+            archive = json.dumps(summaries, ensure_ascii=False)
+            user_message = f"이전 대화에서 보관한 기록 (참고용)\n{archive}\n\n현재 입력\n{user_message}"
+        messages.append({"role": "user", "content": user_message})
         return messages
 
     def _build_prompt(self, state):

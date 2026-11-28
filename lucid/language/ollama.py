@@ -7,7 +7,12 @@ import requests
 
 from lucid.core.kernel import BaseModule
 from lucid.log import Logger
-from lucid.settings import DEFAULT_OLLAMA_URL, MODEL_NAME
+from lucid.settings import (
+    DEFAULT_KEEP_ALIVE,
+    DEFAULT_OLLAMA_URL,
+    DEFAULT_WARMUP_TIMEOUT,
+    MODEL_NAME,
+)
 
 
 class OllamaClient:
@@ -16,23 +21,28 @@ class OllamaClient:
     def __init__(self):
         """환경 설정을 읽고 서버와 통신할 세션을 준비한다."""
         self.base_url = (
-            os.getenv("LUCID_OLLAMA_URL", DEFAULT_OLLAMA_URL).strip().rstrip("/")
+            os.getenv("LUCID_OLLAMA_URL", "").strip().rstrip("/") or DEFAULT_OLLAMA_URL
         )
         self.api_url = f"{self.base_url}/api/chat"
         self.generate_url = f"{self.base_url}/api/generate"
-        self.timeout = self._read_timeout()
-        self.keep_alive = os.getenv("LUCID_OLLAMA_KEEP_ALIVE", "10m").strip() or "10m"
-        self.model = os.getenv("LUCID_OLLAMA_MODEL", MODEL_NAME)
+        self.timeout = self._read_timeout("LUCID_OLLAMA_TIMEOUT", 300)
+        self.warmup_timeout = self._read_timeout(
+            "LUCID_OLLAMA_WARMUP_TIMEOUT", DEFAULT_WARMUP_TIMEOUT
+        )
+        self.keep_alive = (
+            os.getenv("LUCID_OLLAMA_KEEP_ALIVE", "").strip() or DEFAULT_KEEP_ALIVE
+        )
+        self.model = os.getenv("LUCID_OLLAMA_MODEL", "").strip() or MODEL_NAME
         self.session = requests.Session()
         self.last_metrics = {}
 
     @staticmethod
-    def _read_timeout():
-        """환경 변수에 설정된 타임아웃을 허용 범위의 초 단위 정수로 반환한다."""
+    def _read_timeout(variable, default):
+        """환경 변수에서 5~3,600초의 응답 대기 시간을 읽고 잘못된 입력에는 기본값을 쓴다."""
         try:
-            return max(5, min(int(os.getenv("LUCID_OLLAMA_TIMEOUT", "300")), 3600))
+            return max(5, min(int(os.getenv(variable, default)), 3600))
         except ValueError:
-            return 300
+            return default
 
     def close(self):
         """재사용 중이던 HTTP 연결을 닫는다."""
@@ -50,6 +60,7 @@ class OllamaClient:
                     "stream": False,
                     "keep_alive": self.keep_alive,
                     **payload,
+                    "options": {"num_ctx": 4096, **payload.get("options", {})},
                 },
                 timeout=timeout,
             )
@@ -66,10 +77,19 @@ class OllamaClient:
             }
             raise
 
-    def preload(self, timeout=15):
-        """지정한 제한 시간 안에 모델을 미리 불러왔으면 True를 반환한다."""
+    def preload(self, timeout=None):
+        """대화·화면용 모델을 미리 불러온다. timeout은 예열 응답을 기다리는 초 단위 시간이다."""
+        read_timeout = self.warmup_timeout if timeout is None else timeout
         try:
-            self._post(self.generate_url, {"prompt": ""}, (3, timeout), "warmup")
+            result = self._post(
+                self.generate_url,
+                {"prompt": ""},
+                (5, read_timeout),
+                "warmup",
+            )
+            if result.get("done") is not True:
+                self.last_metrics["error"] = True
+                raise ValueError("모델 로드가 완료되지 않았어.")
         except (requests.RequestException, ValueError, TypeError) as error:
             Logger.warning(f"[Ollama] Model warmup skipped ({type(error).__name__})")
             return False

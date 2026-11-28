@@ -31,6 +31,7 @@ class BrainState:
     long_memory: list = field(default_factory=list)
     related_inner_experiences: list = field(default_factory=list)
     related_conversation_episodes: list = field(default_factory=list)
+    session_summaries: list = field(default_factory=list)
     last_conversation_gap: dict = field(default_factory=dict)
     web_context: str = ""
     visual_observation: str = ""

@@ -3,8 +3,10 @@
 import sqlite3
 from datetime import datetime
 from threading import RLock
+from time import monotonic
 
 from lucid.log import Logger
+from lucid.memory import archive
 from lucid.memory.facts import (
     MemoryRecord,
     infer_legacy_memory,
@@ -13,6 +15,7 @@ from lucid.memory.facts import (
 from lucid.memory.facts import (
     memory_key as build_memory_key,
 )
+from lucid.memory.import_legacy import import_old_files, prepare_legacy
 from lucid.memory.search import query_terms
 from lucid.settings import data_directory
 
@@ -107,6 +110,12 @@ class LongTermMemory:
         self.db.commit()
 
         self._migrate()
+        with self.db:
+            archive.prepare_archive(self.db)
+            prepare_legacy(self.db)
+        import_old_files(self.db, directory)
+        self._next_compaction = 0.0
+        self._maintain_archive()
 
     def _migrate(self):
         """이전 기억 행에 구조화된 필드를 채우고 같은 키의 현재 값을 한 건만 유지한다."""
@@ -551,6 +560,55 @@ class LongTermMemory:
 
             return []
 
+    def compact_conversations(self):
+        """7일 지난 대화를 같은 DB의 세션으로 압축하고 이번에 옮긴 턴 수를 반환한다."""
+        with self._lock:
+            count = archive.compact_episodes(self.db)
+            free = self.db.execute("PRAGMA freelist_count").fetchone()[0]
+            if free:
+                pages = self.db.execute("PRAGMA page_count").fetchone()[0]
+                page_size = self.db.execute("PRAGMA page_size").fetchone()[0]
+                if free * 4 >= pages and free * page_size >= 256 * 1024:
+                    try:
+                        self.db.execute("VACUUM")
+                    except sqlite3.Error as error:
+                        # 다른 연결이나 디스크 용량 때문에 파일 축소만 미뤄도 원문은 이미 보관됐다.
+                        Logger.warning(
+                            f"[Conversation Memory] DB compaction deferred: {error}"
+                        )
+            self._next_compaction = monotonic() + 3600
+            return count
+
+    def _maintain_archive(self):
+        """기동 시와 사용 중 매시간 오래된 대화를 옮긴다. 실패해도 완료된 대화는 남아 있다."""
+        with self._lock:
+            if monotonic() < self._next_compaction:
+                return
+            try:
+                self.compact_conversations()
+            except (
+                sqlite3.Error,
+                OSError,
+                UnicodeError,
+                ValueError,
+                TypeError,
+            ) as error:
+                self._next_compaction = monotonic() + 60
+                Logger.notice(
+                    "과거 대화 압축을 완료하지 못했습니다. 기록은 유지되며 다음에 다시 시도합니다."
+                )
+                Logger.error(str(error))
+
+    def session_summaries(self, query="", limit=3):
+        """검색어와 관련된 세션을 먼저, 나머지는 최근순으로 요약 목록에 담는다."""
+        with self._lock:
+            return archive.find_summaries(self.db, query, limit)
+
+    def session_episodes(self, session_id):
+        """지정한 세션의 ID·시각·의도·양쪽 원문을 복원한다. 없는 번호는 빈 목록이다."""
+        with self._lock:
+            return archive.read_session(self.db, int(session_id))
+
     def store_conversation_episode(
         self,
         user_text,
@@ -578,6 +636,7 @@ class LongTermMemory:
                 )
                 episode_id = self.cursor.lastrowid
 
+            self._maintain_archive()
             Logger.info(f"[Conversation Memory] Stored episode #{episode_id}")
             return episode_id
 
@@ -588,8 +647,10 @@ class LongTermMemory:
             Logger.error(f"[Conversation Memory] Store Error : {error}")
             return None
 
-    def search_conversation_episodes(self, query, limit=3, years=5):
-        """최소 5년의 조회 범위에서 질문과 관련된 과거 대화를 관련성순으로 반환한다."""
+    def search_conversation_episodes(
+        self, query, limit=3, years=5, *, include_archived=True
+    ):
+        """질문과 관련된 대화를 반환한다. include_archived=False이면 보관 세션은 열지 않는다."""
         terms = query_terms(query)
         if not terms:
             return []
@@ -634,8 +695,12 @@ class LongTermMemory:
                     """,
                     (*patterns, cutoff, *patterns, limit),
                 )
-                rows = self.cursor.fetchall()
-            return [dict(row) for row in rows]
+                recent = [dict(row) for row in self.cursor.fetchall()]
+                return (
+                    archive.merge_search(self.db, recent, terms, cutoff, limit)
+                    if include_archived
+                    else recent
+                )
 
         except Exception as error:
             Logger.error(f"[Conversation Memory] Search Error : {error}")
@@ -656,8 +721,8 @@ class LongTermMemory:
                     """,
                     (limit,),
                 )
-                rows = self.cursor.fetchall()
-            return [dict(row) for row in reversed(rows)]
+                recent = [dict(row) for row in self.cursor.fetchall()]
+                return archive.merge_recent(self.db, recent, limit)
 
         except (TypeError, ValueError):
             Logger.error("[Conversation Memory] Invalid recent episode limit")
@@ -701,15 +766,14 @@ class LongTermMemory:
         """마지막 대화의 시각, 경과 시간과 출처를 반환하고 대화가 없으면 근사치를 구분한다."""
         try:
             with self._lock:
-                self.cursor.execute(
-                    """
-                    SELECT created_at
-                    FROM conversation_episodes
-                    ORDER BY id DESC
-                    LIMIT 1
-                    """
-                )
-                row = self.cursor.fetchone()
+                row = self.cursor.execute(
+                    """SELECT created_at FROM (
+                           SELECT id, created_at FROM (SELECT id, created_at FROM conversation_episodes ORDER BY id DESC LIMIT 1)
+                           UNION ALL
+                           SELECT max_episode_id, last_episode_at FROM
+                               (SELECT max_episode_id, last_episode_at FROM conversation_sessions ORDER BY max_episode_id DESC LIMIT 1)
+                       ) ORDER BY id DESC LIMIT 1"""
+                ).fetchone()
                 source = "conversation"
 
                 if row is None:

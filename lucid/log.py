@@ -7,11 +7,13 @@ class Logger:
     """콘솔 로그를 기록하는 공용 인터페이스."""
 
     _debug = False
+    _output = staticmethod(print)
 
     @classmethod
-    def configure(cls, debug: bool) -> None:
-        """debug가 참이면 모든 스레드의 상세 로그를 표시한다."""
+    def configure(cls, debug: bool, output=None) -> None:
+        """모든 스레드의 로그 수준과 출력 함수를 지정한다. 기본 출력은 콘솔이다."""
         cls._debug = debug
+        cls._output = staticmethod(print if output is None else output)
 
     @classmethod
     def notice(cls, message: str) -> None:
@@ -19,14 +21,14 @@ class Logger:
         if cls._debug:
             cls._write("INFO", message)
         else:
-            print(message)
+            cls._output(message)
 
     @staticmethod
     def _write(level: str, message: str) -> None:
         """로그 수준과 메시지를 받아 현재 로컬 시각과 함께 한 줄을 출력한다."""
         if not Logger._debug:
             return
-        print(f"[{datetime.now():%H:%M:%S}] [{level}] {message}")
+        Logger._output(f"[{datetime.now():%H:%M:%S}] [{level}] {message}")
 
     @staticmethod
     def info(message: str) -> None:
